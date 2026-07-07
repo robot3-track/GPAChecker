@@ -1,0 +1,6 @@
+{
+  "name": "Grade Checker",
+  "description": "A minimalist grade and GPA calculator that projects target scores and extracts class grading weights from syllabus resources.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
