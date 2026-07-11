@@ -55,6 +55,7 @@ interface GPAScaleRule {
 }
 
 const DEFAULT_GPA_SCALE: GPAScaleRule[] = [
+  { grade: "A+", points: 4.0, minPercent: 98},
   { grade: "A", points: 4.0, minPercent: 93 },
   { grade: "A-", points: 3.7, minPercent: 90 },
   { grade: "B+", points: 3.3, minPercent: 87 },
@@ -1334,7 +1335,7 @@ export default function GradeCheckerApp() {
                       fontSize="9"
                       className="font-semibold fill-slate-500 uppercase tracking-wider"
                     >
-                      Score on Pending Remaining Assignments / Final
+                      Score on Pending Remaining Assignments / Final Score
                     </text>
                   </svg>
 
@@ -1387,7 +1388,7 @@ export default function GradeCheckerApp() {
                 <div className="flex justify-between items-center">
                   <h3 className="font-display font-semibold text-slate-800 flex items-center gap-2">
                     <Settings size={16} className="text-slate-500" />
-                    <span>Your School Scale Rules</span>
+                    <span>Your School's GPA Rules</span>
                   </h3>
                   <button
                     id="btn-toggle-scale-config"
