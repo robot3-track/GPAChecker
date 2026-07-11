@@ -54,8 +54,7 @@ interface GPAScaleRule {
   minPercent: number;
 }
 
-// Standard scale, but honestly check your teacher's syllabus because 
-// some of them do not believe in A+ and it completely ruins your semester goals.
+// Standard scale, but honestly check your teacher's syllabus because some of them do not believe in A+ and it completely ruins your semester goals lol.
 const DEFAULT_GPA_SCALE: GPAScaleRule[] = [
   { grade: "A+", points: 4.0, minPercent: 98},
   { grade: "A", points: 4.0, minPercent: 93 },
@@ -130,8 +129,7 @@ export default function GradeCheckerApp() {
       const stored = localStorage.getItem("gc_weightingConfig");
       if (stored) return JSON.parse(stored);
     }
-    // STUDENT COMMENT: AP and IB get full 1.0 boost at our school. Honors gets 0.5. 
-    // If your school uses a weird 5.0 scale change these settings immediately.
+    //  AP and IB get full 1.0 boost at our school. Honors gets 0.5, but this is all changeable of course lol with the settings (my school doesn't do 0.5, does 1, but my school is unqiue afterall)
     return {
       regularBoost: 0,
       honorsBoost: 0.5,
@@ -283,8 +281,7 @@ export default function GradeCheckerApp() {
       requiredScoreOnPending = (remainingPointsNeeded / pendingPoints) * 100;
     }
 
-    // STUDENT COMMENT: Extra credit happens, so we allow up to 120% projection max, 
-    // but absolutely nothing higher so people don't break the layout with joke inputs.
+    // Extra credit happens, so we allow up to 120% projection max, but absolutely nothing higher so people don't break the layout with unreal inputs.
     const finalRequired = requiredScoreOnPending !== null ? Math.min(120, Math.round(requiredScoreOnPending * 100) / 100) : null;
 
     return {

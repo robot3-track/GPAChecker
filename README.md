@@ -18,3 +18,5 @@ Gemini Key = GEMINI_API_KEY = (your_api_key)
 
 # Try it now!
 Try the live deployment at: https://gpacheck.vercel.app . This is the official deployment.
+
+Created by Y Chang, student of Marina High School (2026)
