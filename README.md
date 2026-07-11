@@ -7,3 +7,6 @@ This project is a free open-source GPA/Grade checker for students to use. Studen
 
 # Features
 The project includes graphs that depict waht is needed to reach the student's goals, as well as predictions based off potential inputs.
+
+# API Keys Used
+Gemini API Key - For copy/pasting your class syllabus to create automatic grade weighting format.
