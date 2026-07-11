@@ -1066,7 +1066,7 @@ export default function GradeCheckerApp() {
                   ) : (
                     <div className="p-4 rounded-lg bg-green-50 border border-green-200 text-green-800 text-sm font-medium flex gap-2">
                       <Check size={18} className="shrink-0" />
-                      <span>All coursework is graded. This is your final course grade!</span>
+                      <span>All coursework is setup! This is your final course grade!</span>
                     </div>
                   )}
                 </div>
