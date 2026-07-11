@@ -54,6 +54,8 @@ interface GPAScaleRule {
   minPercent: number;
 }
 
+// STUDENT COMMENT: Standard scale, but honestly check your teacher's syllabus because 
+// some of them do not believe in A+ and it completely ruins your semester goals.
 const DEFAULT_GPA_SCALE: GPAScaleRule[] = [
   { grade: "A+", points: 4.0, minPercent: 98},
   { grade: "A", points: 4.0, minPercent: 93 },
@@ -128,6 +130,8 @@ export default function GradeCheckerApp() {
       const stored = localStorage.getItem("gc_weightingConfig");
       if (stored) return JSON.parse(stored);
     }
+    // STUDENT COMMENT: AP and IB get full 1.0 boost at our school. Honors gets 0.5. 
+    // If your school uses a weird 5.0 scale change these settings immediately.
     return {
       regularBoost: 0,
       honorsBoost: 0.5,
@@ -246,12 +250,16 @@ export default function GradeCheckerApp() {
       requiredScoreOnPending = ((desiredGrade - earnedWeightContribution) / pendingWeight) * 100;
     }
 
+    // STUDENT COMMENT: Added a strict 120% cap here. Otherwise, if you are failing a class 
+    // and set your target to a 98%, the required score goes to like 450% and breaks the SVG bounding box.
+    const finalRequired = requiredScoreOnPending !== null ? Math.min(120, Math.round(requiredScoreOnPending * 100) / 100) : null;
+
     return {
-      currentOverallGrade: Math.round(currentOverallGrade * 100) / 100,
+      currentOverallGrade: Math.min(120, Math.round(currentOverallGrade * 100) / 100),
       totalEarnedWeightPercent: Math.round(earnedWeightContribution * 100) / 100,
       totalWeightEvaluated: totalWeight,
       pendingWeight,
-      requiredScoreOnPending: requiredScoreOnPending !== null ? Math.round(requiredScoreOnPending * 100) / 100 : null,
+      requiredScoreOnPending: finalRequired,
       earnedWeightContribution,
     };
   };
@@ -275,14 +283,18 @@ export default function GradeCheckerApp() {
       requiredScoreOnPending = (remainingPointsNeeded / pendingPoints) * 100;
     }
 
+    // STUDENT COMMENT: Extra credit happens, so we allow up to 120% projection max, 
+    // but absolutely nothing higher so people don't break the layout with joke inputs.
+    const finalRequired = requiredScoreOnPending !== null ? Math.min(120, Math.round(requiredScoreOnPending * 100) / 100) : null;
+
     return {
-      currentOverallGrade: Math.round(currentOverallGrade * 100) / 100,
+      currentOverallGrade: Math.min(120, Math.round(currentOverallGrade * 100) / 100),
       earnedPoints,
       maxCompletedPoints,
       pendingPoints,
       totalPossiblePoints,
       remainingPointsNeeded: Math.max(0, Math.round(remainingPointsNeeded * 100) / 100),
-      requiredScoreOnPending: requiredScoreOnPending !== null ? Math.round(requiredScoreOnPending * 100) / 100 : null,
+      requiredScoreOnPending: finalRequired,
     };
   };
 
@@ -528,12 +540,15 @@ export default function GradeCheckerApp() {
   const graphWidth = 460;
   const graphHeight = 220;
 
+  // STUDENT COMMENT: The Y-axis maxes out elegantly at 120 so the curve doesn't clip out 
+  // into space if you have a massive extra credit score.
   const getSvgCoords = (xVal: number, yVal: number) => {
+    const clampedY = Math.min(120, Math.max(0, yVal));
     const xRange = graphWidth - graphPadding.left - graphPadding.right;
     const svgX = graphPadding.left + (xVal / 100) * xRange;
 
     const yRange = graphHeight - graphPadding.top - graphPadding.bottom;
-    const svgY = graphPadding.top + yRange - (yVal / 100) * yRange;
+    const svgY = graphPadding.top + yRange - (clampedY / 120) * yRange;
 
     return { x: svgX, y: svgY };
   };
@@ -566,8 +581,9 @@ export default function GradeCheckerApp() {
       const finalGrade = sumSyllabusWeight > 0 
         ? ((earnedWeightContribution + (pendingWeight * (x / 100))) / sumSyllabusWeight) * 100 
         : 100;
-      const coords = getSvgCoords(x, finalGrade);
-      points.push({ xVal: x, yVal: finalGrade, svgX: coords.x, svgY: coords.y });
+      const cappedFinalGrade = Math.min(120, finalGrade);
+      const coords = getSvgCoords(x, cappedFinalGrade);
+      points.push({ xVal: x, yVal: cappedFinalGrade, svgX: coords.x, svgY: coords.y });
     }
   } else {
     const completedAssignments = pointsAssignments.filter((a) => a.completed);
@@ -582,8 +598,9 @@ export default function GradeCheckerApp() {
       const finalGrade = totalPossiblePoints > 0 
         ? ((earnedPoints + (pendingPoints * (x / 100))) / totalPossiblePoints) * 100 
         : 100;
-      const coords = getSvgCoords(x, finalGrade);
-      points.push({ xVal: x, yVal: finalGrade, svgX: coords.x, svgY: coords.y });
+      const cappedFinalGrade = Math.min(120, finalGrade);
+      const coords = getSvgCoords(x, cappedFinalGrade);
+      points.push({ xVal: x, yVal: cappedFinalGrade, svgX: coords.x, svgY: coords.y });
     }
   }
 
@@ -598,10 +615,12 @@ export default function GradeCheckerApp() {
     : "";
 
   const targetRequiredScore = currentGradeResults.requiredScoreOnPending;
-  const isTargetVisible = targetRequiredScore !== null && targetRequiredScore >= 0 && targetRequiredScore <= 100;
+  // STUDENT COMMENT: The horizontal/vertical line helper stays hidden if you need higher than 120% 
+  // because that means it's physically impossible anyway.
+  const isTargetVisible = targetRequiredScore !== null && targetRequiredScore >= 0 && targetRequiredScore <= 120;
   const targetCoords = isTargetVisible ? getSvgCoords(targetRequiredScore, desiredGrade) : null;
 
-  const scaleGridLines = [90, 80, 70, 60];
+  const scaleGridLines = [110, 90, 70, 50];
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8 font-sans text-gray-900 bg-gray-50 min-h-screen">
@@ -612,7 +631,7 @@ export default function GradeCheckerApp() {
             Grade & GPA Checker
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Calculate your current standing, find required scores, and plan your GPA.
+            Built by students, for students. Calculate required finals scores and project semester outcomes.
           </p>
         </div>
 
@@ -724,7 +743,7 @@ export default function GradeCheckerApp() {
                       <input
                         type="range"
                         min="50"
-                        max="100"
+                        max="120"
                         step="0.5"
                         value={desiredGrade}
                         onChange={(e) => saveDesiredGrade(Number(e.target.value))}
@@ -734,9 +753,9 @@ export default function GradeCheckerApp() {
                         <input
                           type="number"
                           min="0"
-                          max="100"
+                          max="120"
                           value={desiredGrade}
-                          onChange={(e) => saveDesiredGrade(Math.min(150, Math.max(0, Number(e.target.value))))}
+                          onChange={(e) => saveDesiredGrade(Math.min(120, Math.max(0, Number(e.target.value))))}
                           className="w-16 text-center text-sm font-medium text-gray-900 border border-gray-300 rounded-md py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm"
                         />
                         <span className="ml-1 text-gray-500 font-medium">%</span>
@@ -826,7 +845,8 @@ export default function GradeCheckerApp() {
                                         value={cat.currentScore === null ? "" : cat.currentScore}
                                         onChange={(e) => {
                                           const val = e.target.value;
-                                          handleUpdateCategory(cat.id, "currentScore", val === "" ? null : Number(val));
+                                          // STUDENT COMMENT: Max out single manual scores at 120% too so they don't break the individual item average layout rows.
+                                          handleUpdateCategory(cat.id, "currentScore", val === "" ? null : Math.min(120, Number(val)));
                                         }}
                                         className="w-16 text-center text-sm font-medium text-gray-900 border border-gray-300 rounded-md py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm placeholder:text-gray-400"
                                         placeholder="TBD"
@@ -1032,7 +1052,11 @@ export default function GradeCheckerApp() {
                       <h4 className="text-xs font-semibold uppercase text-blue-800 tracking-wide">Required Target</h4>
                       <p className="text-sm font-medium text-blue-900 leading-relaxed">
                         To achieve an overall grade of <strong>{desiredGrade}%</strong>, you need to average at least{" "}
-                        <strong className="text-lg bg-blue-200 px-1.5 rounded">{currentGradeResults.requiredScoreOnPending}%</strong> on your remaining{" "}
+                        <strong className="text-lg bg-blue-200 px-1.5 rounded">
+                          {currentGradeResults.requiredScoreOnPending > 100 
+                            ? "Extra Credit needed (>100%)" 
+                            : `${currentGradeResults.requiredScoreOnPending}%`}
+                        </strong> on your remaining{" "}
                         {gradingMode === "weighted"
                           ? `pending weight (${(currentGradeResults as any).pendingWeight}%)`
                           : `pending assignments (${(currentGradeResults as any).pendingPoints} pts)`}
@@ -1061,6 +1085,7 @@ export default function GradeCheckerApp() {
                     className="w-full h-auto overflow-visible"
                     style={{ maxHeight: "240px" }}
                   >
+                    {/* STUDENT COMMENT: Modified grid lines to include 110% because extra credit is real life */}
                     {scaleGridLines.map((percent) => {
                       const { y } = getSvgCoords(0, percent);
                       return (
@@ -1078,7 +1103,7 @@ export default function GradeCheckerApp() {
                       );
                     })}
 
-                    {desiredGrade > 0 && desiredGrade <= 100 && (
+                    {desiredGrade > 0 && desiredGrade <= 120 && (
                       <g>
                         <line
                           x1={graphPadding.left} y1={getSvgCoords(0, desiredGrade).y}
