@@ -16,7 +16,7 @@ const spaceGrotesk = Space_Grotesk({
 
 export const metadata: Metadata = {
   title: 'Grade & GPA Checker',
-  description: 'A minimalist academic grade projection tool and GPA customizer.',
+  description: 'A simple academic grade projection tool and GPA customizer for Grade calculations.',
 };
 
 export default function RootLayout({children}: {children: React.ReactNode}) {

@@ -1,7 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { NextRequest, NextResponse } from "next/server";
 
-// Initialize the Gemini client server-side
+// Initialize the Gemini client server-side for API use
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY || "",
   httpOptions: {
@@ -17,14 +17,14 @@ export async function POST(req: NextRequest) {
 
     if (!text || typeof text !== "string") {
       return NextResponse.json(
-        { error: "Syllabus text is required." },
+        { error: "Syllabus text is required. Please input your existing syllabus." },
         { status: 400 }
       );
     }
 
     if (!process.env.GEMINI_API_KEY) {
       return NextResponse.json(
-        { error: "GEMINI_API_KEY env variable is not set on the server." },
+        { error: "GEMINI_API_KEY env variable is not set on the server. Please set up your own GEMINI_API_KEY on your deployment end (e.g. Vercel)" },
         { status: 500 }
       );
     }

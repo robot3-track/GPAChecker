@@ -681,7 +681,7 @@ export default function GradeCheckerApp() {
             }`}
           >
             <GraduationCap size={16} />
-            <span>Semester GPA Planner</span>
+            <span>Semester GPA Planner/Calculator</span>
           </button>
         </div>
       </div>
@@ -718,7 +718,7 @@ export default function GradeCheckerApp() {
                       id="btn-import-syllabus"
                       onClick={() => setShowImportDialog(true)}
                       className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 rounded-lg transition-all cursor-pointer"
-                      title="Analyze your course syllabus using AI to populate grades and categories automatically"
+                      title="Analyze your course syllabus using AI to automatically display your grades and categories into the grade calculator"
                     >
                       <Sparkles size={13} className="text-indigo-600 animate-pulse" />
                       <span>Import Syllabus with AI</span>
@@ -829,7 +829,7 @@ export default function GradeCheckerApp() {
                         <div className="p-8 text-center" id="empty-weighted-categories">
                           <p className="text-sm text-slate-500 font-medium">No grading categories defined yet.</p>
                           <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
-                            Click <strong>Add Category</strong> above to add one manually, or use the <strong>Syllabus AI Import</strong> button to parse your syllabus!
+                            Click <strong>Add Category</strong> above to add one manually, or use the <strong>Import Syllabus with AI</strong> button to parse your syllabus!
                           </p>
                         </div>
                       ) : (
