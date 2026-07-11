@@ -1691,7 +1691,7 @@ export default function GradeCheckerApp() {
 
               <div className="p-6 space-y-4">
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  Paste course description, syllabus snippets, or grading guidelines (e.g., &quot;Homework: 20%, Tests: 50%, Final: 30%&quot;) below. Gemini will automatically configure the correct grading framework, weights, categories, and scale for you!
+                  Paste course description, syllabus parts, or grading guidelines (e.g., &quot;Homework: 20%, Tests: 50%, Final: 30%&quot;) below. Gemini will automatically configure the correct grading framework, weights, categories, and scale for you!
                 </p>
 
                 <textarea
@@ -1733,7 +1733,7 @@ Grade thresholds: A (93%), A- (90%), B+ (87%)..."
                   {isParsing ? (
                     <>
                       <div className="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      <span>Parsing with Gemini...</span>
+                      <span>Parsing with Artificial Intellegence...</span>
                     </>
                   ) : (
                     <>
