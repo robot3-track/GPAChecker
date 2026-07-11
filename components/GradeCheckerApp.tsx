@@ -54,7 +54,7 @@ interface GPAScaleRule {
   minPercent: number;
 }
 
-// STUDENT COMMENT: Standard scale, but honestly check your teacher's syllabus because 
+// Standard scale, but honestly check your teacher's syllabus because 
 // some of them do not believe in A+ and it completely ruins your semester goals.
 const DEFAULT_GPA_SCALE: GPAScaleRule[] = [
   { grade: "A+", points: 4.0, minPercent: 98},
@@ -540,8 +540,7 @@ export default function GradeCheckerApp() {
   const graphWidth = 460;
   const graphHeight = 220;
 
-  // STUDENT COMMENT: The Y-axis maxes out elegantly at 120 so the curve doesn't clip out 
-  // into space if you have a massive extra credit score.
+  // The Y-axis maxes out elegantly at 120 so the curve doesn't clip out into space if you have a massive extra credit score.
   const getSvgCoords = (xVal: number, yVal: number) => {
     const clampedY = Math.min(120, Math.max(0, yVal));
     const xRange = graphWidth - graphPadding.left - graphPadding.right;
@@ -615,8 +614,7 @@ export default function GradeCheckerApp() {
     : "";
 
   const targetRequiredScore = currentGradeResults.requiredScoreOnPending;
-  // STUDENT COMMENT: The horizontal/vertical line helper stays hidden if you need higher than 120% 
-  // because that means it's physically impossible anyway.
+  // The horizontal/vertical line helper stays hidden if you need higher than 120% because that means it's physically impossible anyway.
   const isTargetVisible = targetRequiredScore !== null && targetRequiredScore >= 0 && targetRequiredScore <= 120;
   const targetCoords = isTargetVisible ? getSvgCoords(targetRequiredScore, desiredGrade) : null;
 
@@ -845,7 +843,7 @@ export default function GradeCheckerApp() {
                                         value={cat.currentScore === null ? "" : cat.currentScore}
                                         onChange={(e) => {
                                           const val = e.target.value;
-                                          // STUDENT COMMENT: Max out single manual scores at 120% too so they don't break the individual item average layout rows.
+                                          // Max out single manual scores at 120% too so they don't break the individual item average layout rows.
                                           handleUpdateCategory(cat.id, "currentScore", val === "" ? null : Math.min(120, Number(val)));
                                         }}
                                         className="w-16 text-center text-sm font-medium text-gray-900 border border-gray-300 rounded-md py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm placeholder:text-gray-400"
@@ -1085,7 +1083,7 @@ export default function GradeCheckerApp() {
                     className="w-full h-auto overflow-visible"
                     style={{ maxHeight: "240px" }}
                   >
-                    {/* STUDENT COMMENT: Modified grid lines to include 110% because extra credit is real life */}
+                    {/*Modified grid lines to include 110% because extra credit is real life */}
                     {scaleGridLines.map((percent) => {
                       const { y } = getSvgCoords(0, percent);
                       return (
