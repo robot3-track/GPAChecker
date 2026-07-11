@@ -626,7 +626,7 @@ export default function GradeCheckerApp() {
             Grade & GPA Checker
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Built by students, for students. Calculate required finals scores and project semester outcomes.
+            Built by a student, for students. Calculate required finasl scores and project semester outcomes.
           </p>
         </div>
 
