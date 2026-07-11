@@ -721,7 +721,7 @@ export default function GradeCheckerApp() {
                       title="Analyze your course syllabus using AI to populate grades and categories automatically"
                     >
                       <Sparkles size={13} className="text-indigo-600 animate-pulse" />
-                      <span>Syllabus AI Import</span>
+                      <span>Import Syllabus with AI</span>
                     </button>
                     <button
                       id="btn-reset-class"
@@ -738,7 +738,7 @@ export default function GradeCheckerApp() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                   <div>
                     <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
-                      Grading Framework
+                      Grading Structure
                     </label>
                     <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200" id="grading-mode-switch">
                       <button
