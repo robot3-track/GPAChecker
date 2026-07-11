@@ -750,7 +750,7 @@ export default function GradeCheckerApp() {
                             : "text-slate-500 hover:text-slate-800"
                         }`}
                       >
-                        Weighted Weights
+                        Weighted Assignments
                       </button>
                       <button
                         id="btn-mode-points"
@@ -761,7 +761,7 @@ export default function GradeCheckerApp() {
                             : "text-slate-500 hover:text-slate-800"
                         }`}
                       >
-                        Non-Weighted Points
+                        Non-Weighted Assignments
                       </button>
                     </div>
                   </div>
