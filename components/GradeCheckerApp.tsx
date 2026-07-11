@@ -197,7 +197,7 @@ export default function GradeCheckerApp() {
   };
 
   const resetClassData = () => {
-    if (confirm("Are you sure you want to reset class data?")) {
+    if (confirm("Are you sure you want to reset class data? This action cannot be undone.")) {
       localStorage.removeItem("gc_classTitle");
       localStorage.removeItem("gc_desiredGrade");
       localStorage.removeItem("gc_gradingMode");
@@ -208,7 +208,7 @@ export default function GradeCheckerApp() {
   };
 
   const resetGPAData = () => {
-    if (confirm("Are you sure you want to reset GPA planner?")) {
+    if (confirm("Are you sure you want to reset your GPA planner? This action cannot be undone.")) {
       localStorage.removeItem("gc_gpaCourses");
       localStorage.removeItem("gc_gpaRules");
       localStorage.removeItem("gc_weightingConfig");
@@ -217,7 +217,6 @@ export default function GradeCheckerApp() {
   };
 
   // --- MATH CALCULATIONS ---
-
   const calculateWeightedGrade = () => {
     let totalWeight = 0;
     let earnedWeightContribution = 0;
@@ -514,11 +513,11 @@ export default function GradeCheckerApp() {
         setShowImportDialog(false);
         setSyllabusText("");
       } else {
-        throw new Error("Could not extract grading system cleanly. Please paste more section details.");
+        throw new Error("Could not extract grading system cleanly. Please check the text and try again.");
       }
     } catch (err: any) {
       console.error(err);
-      setParseError(err.message || "Something went wrong while communicating with Gemini API.");
+      setParseError(err.message || "Something went wrong while processing your syllabus.");
     } finally {
       setIsParsing(false);
     }
@@ -605,43 +604,41 @@ export default function GradeCheckerApp() {
   const scaleGridLines = [90, 80, 70, 60];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8 font-sans">
-      {/* HEADER section: Simplistic borders, square corners */}
-      <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between border-b-2 border-black pb-4" id="app-header-container">
+    <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8 font-sans text-gray-900 bg-gray-50 min-h-screen">
+      {/* HEADER SECTION */}
+      <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between pb-6 border-b border-gray-200">
         <div>
-          <h1 className="text-3xl font-bold text-black" id="app-title-main">
+          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
             Grade & GPA Checker
           </h1>
-          <p className="text-sm text-gray-600 mt-1" id="app-subtitle">
-            A basic workspace to compute required scores, project course grades, and map GPA.
+          <p className="text-sm text-gray-500 mt-1">
+            Calculate your current standing, find required scores, and plan your GPA.
           </p>
         </div>
 
-        {/* Navigation tabs */}
-        <div className="flex gap-2 mt-4 md:mt-0" id="nav-tabs-wrapper">
+        {/* Navigation Tabs */}
+        <div className="flex gap-2 mt-4 md:mt-0 bg-gray-200 p-1 rounded-lg">
           <button
-            id="tab-btn-class"
             onClick={() => setActiveTab("class")}
-            className={`flex items-center gap-2 px-4 py-2 border-2 border-black font-bold transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium text-sm transition-colors cursor-pointer ${
               activeTab === "class"
-                ? "bg-black text-white"
-                : "bg-white text-black hover:bg-gray-200"
+                ? "bg-white text-gray-900 shadow-sm"
+                : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
             }`}
           >
             <Calculator size={16} />
-            <span>Class Grade</span>
+            <span>Class Grade Calculator</span>
           </button>
           <button
-            id="tab-btn-gpa"
             onClick={() => setActiveTab("gpa")}
-            className={`flex items-center gap-2 px-4 py-2 border-2 border-black font-bold transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium text-sm transition-colors cursor-pointer ${
               activeTab === "gpa"
-                ? "bg-black text-white"
-                : "bg-white text-black hover:bg-gray-200"
+                ? "bg-white text-gray-900 shadow-sm"
+                : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
             }`}
           >
             <GraduationCap size={16} />
-            <span>Semester GPA</span>
+            <span>Semester GPA Planner</span>
           </button>
         </div>
       </div>
@@ -656,170 +653,163 @@ export default function GradeCheckerApp() {
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.15 }}
             className="grid grid-cols-1 lg:grid-cols-12 gap-6"
-            id="tab-class-container"
           >
             {/* Input Column */}
-            <div className="lg:col-span-7 space-y-6" id="class-inputs-column">
-              {/* Class Header Configuration */}
-              <div className="bg-white p-6 border-2 border-gray-400 space-y-4" id="class-config-card">
-                <div className="flex justify-between items-center border-b-2 border-gray-200 pb-4">
-                  <div className="flex items-center gap-3 w-full">
-                    <input
-                      type="text"
-                      id="input-class-title"
-                      value={classTitle}
-                      onChange={(e) => saveClassTitle(e.target.value)}
-                      className="text-lg font-bold text-black bg-transparent border-b-2 border-dashed border-gray-400 focus:border-black focus:outline-none py-1 px-1 w-full"
-                      placeholder="Enter Class Title..."
-                    />
-                  </div>
-                  <div className="flex gap-2">
+            <div className="lg:col-span-7 space-y-6">
+              {/* Class Configuration Card */}
+              <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-5">
+                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 border-b border-gray-100 pb-5">
+                  <input
+                    type="text"
+                    value={classTitle}
+                    onChange={(e) => saveClassTitle(e.target.value)}
+                    className="text-xl font-semibold text-gray-900 bg-transparent border-b border-gray-300 hover:border-gray-400 focus:border-blue-500 focus:outline-none py-1 w-full max-w-sm transition-colors"
+                    placeholder="Enter Course Title..."
+                  />
+                  <div className="flex gap-2 shrink-0">
                     <button
-                      id="btn-import-syllabus"
                       onClick={() => setShowImportDialog(true)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-blue-800 bg-blue-100 border-2 border-blue-400 hover:bg-blue-200 transition-all cursor-pointer"
-                      title="Analyze your course syllabus using AI"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 rounded-md transition-colors cursor-pointer shadow-sm"
                     >
-                      <Sparkles size={13} />
-                      <span>AI Import</span>
+                      <Sparkles size={14} />
+                      <span>Import Syllabus with AI</span>
                     </button>
                     <button
-                      id="btn-reset-class"
                       onClick={resetClassData}
-                      className="p-1.5 border-2 border-gray-300 bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all cursor-pointer"
-                      title="Reset everything to defaults"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 rounded-md transition-colors cursor-pointer shadow-sm"
+                      title="Clear all class data"
                     >
-                      <RotateCcw size={15} />
+                      <RotateCcw size={14} />
+                      <span>Reset</span>
                     </button>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm font-bold text-black uppercase mb-2">
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
                       Grading Structure
                     </label>
-                    <div className="flex border-2 border-gray-400" id="grading-mode-switch">
+                    <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-200 shadow-inner">
                       <button
-                        id="btn-mode-weighted"
                         onClick={() => saveGradingMode("weighted")}
-                        className={`flex-1 py-1 px-3 text-xs font-bold border-r-2 border-gray-400 transition-all cursor-pointer ${
+                        className={`flex-1 py-1.5 px-3 text-sm font-medium rounded-md transition-colors cursor-pointer ${
                           gradingMode === "weighted"
-                            ? "bg-gray-300 text-black"
-                            : "bg-white text-gray-600 hover:bg-gray-100"
+                            ? "bg-white text-gray-900 shadow-sm border border-gray-200"
+                            : "text-gray-500 hover:text-gray-700"
                         }`}
                       >
                         Weighted
                       </button>
                       <button
-                        id="btn-mode-points"
                         onClick={() => saveGradingMode("points")}
-                        className={`flex-1 py-1 px-3 text-xs font-bold transition-all cursor-pointer ${
+                        className={`flex-1 py-1.5 px-3 text-sm font-medium rounded-md transition-colors cursor-pointer ${
                           gradingMode === "points"
-                            ? "bg-gray-300 text-black"
-                            : "bg-white text-gray-600 hover:bg-gray-100"
+                            ? "bg-white text-gray-900 shadow-sm border border-gray-200"
+                            : "text-gray-500 hover:text-gray-700"
                         }`}
                       >
-                        Points
+                        Total Points
                       </button>
                     </div>
                   </div>
 
                   <div>
                     <div className="flex justify-between items-center mb-2">
-                      <label className="block text-sm font-bold text-black uppercase">
-                        Desired Grade Target
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        Desired Target Grade
                       </label>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-4">
                       <input
                         type="range"
-                        id="desired-grade-slider"
                         min="50"
                         max="100"
                         step="0.5"
                         value={desiredGrade}
                         onChange={(e) => saveDesiredGrade(Number(e.target.value))}
-                        className="w-full h-2 bg-gray-300 cursor-pointer"
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                       />
-                      <input
-                        type="number"
-                        id="desired-grade-number"
-                        min="0"
-                        max="100"
-                        value={desiredGrade}
-                        onChange={(e) => saveDesiredGrade(Math.min(150, Math.max(0, Number(e.target.value))))}
-                        className="w-16 text-center text-sm font-bold text-black border-2 border-gray-400 py-1 focus:outline-black"
-                      />
-                      <span className="font-bold">%</span>
+                      <div className="flex items-center">
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={desiredGrade}
+                          onChange={(e) => saveDesiredGrade(Math.min(150, Math.max(0, Number(e.target.value))))}
+                          className="w-16 text-center text-sm font-medium text-gray-900 border border-gray-300 rounded-md py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm"
+                        />
+                        <span className="ml-1 text-gray-500 font-medium">%</span>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* DYNAMIC LIST */}
-              <div className="bg-white border-2 border-gray-400" id="grade-items-card">
-                <div className="px-6 py-4 border-b-2 border-gray-400 flex justify-between items-center bg-gray-100">
-                  <h3 className="font-bold text-black">
+              {/* Dynamic Grading List */}
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                  <h3 className="font-semibold text-gray-800">
                     {gradingMode === "weighted" ? "Categories & Weights" : "Assignment List"}
                   </h3>
                   <button
-                    id="btn-add-item"
                     onClick={gradingMode === "weighted" ? handleAddCategory : handleAddPointAssignment}
-                    className="flex items-center gap-1.5 px-3 py-1 text-sm font-bold border-2 border-black bg-white hover:bg-gray-200 transition-all cursor-pointer"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm transition-colors cursor-pointer"
                   >
-                    <Plus size={14} />
-                    <span>Add</span>
+                    <Plus size={16} />
+                    <span>
+                      {gradingMode === "weighted" ? "Add Grading Category" : "Add New Assignment"}
+                    </span>
                   </button>
                 </div>
 
-                <div className="divide-y-2 divide-gray-200">
-                  {/* WEIGHTED */}
+                <div className="divide-y divide-gray-100">
+                  {/* WEIGHTED MODE */}
                   {gradingMode === "weighted" && (
                     <>
                       {weightedCategories.length === 0 ? (
-                        <div className="p-8 text-center text-gray-600">
-                          <p className="font-bold">No categories added.</p>
+                        <div className="p-10 text-center text-gray-500">
+                          <p className="font-medium text-gray-600">No grading categories defined.</p>
+                          <p className="text-sm mt-1">Click "Add Grading Category" or use AI to import your syllabus.</p>
                         </div>
                       ) : (
                         weightedCategories.map((cat) => (
-                          <div key={cat.id} className="p-4 sm:p-6" id={`weighted-cat-${cat.id}`}>
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                              <div className="flex items-center gap-2 flex-1">
+                          <div key={cat.id} className="p-4 sm:p-6 transition-colors hover:bg-gray-50/50">
+                            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+                              <div className="flex items-center gap-3 flex-1">
                                 <button
-                                  id={`btn-toggle-expand-${cat.id}`}
                                   onClick={() => handleUpdateCategory(cat.id, "isExpanded", !cat.isExpanded)}
-                                  className="p-1 border border-gray-300 bg-gray-100 hover:bg-gray-200 cursor-pointer"
+                                  className="p-1.5 text-gray-400 border border-gray-200 bg-white rounded-md hover:bg-gray-50 hover:text-gray-600 transition-colors shadow-sm cursor-pointer"
                                 >
                                   {cat.isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                                 </button>
                                 <input
                                   type="text"
-                                  id={`input-cat-name-${cat.id}`}
                                   value={cat.name}
                                   onChange={(e) => handleUpdateCategory(cat.id, "name", e.target.value)}
-                                  className="font-bold text-black border-b-2 border-transparent hover:border-gray-300 focus:border-black focus:outline-none py-1 w-full max-w-[200px]"
+                                  className="font-medium text-gray-900 border-b border-gray-300 bg-transparent hover:border-gray-400 focus:border-blue-500 focus:outline-none py-1 w-full max-w-[220px]"
                                   placeholder="Category Name"
                                 />
                               </div>
 
-                              <div className="flex items-center gap-4">
-                                <div className="flex items-center gap-1">
-                                  <span className="text-sm font-bold text-gray-600">Wgt:</span>
-                                  <input
-                                    type="number"
-                                    id={`input-cat-weight-${cat.id}`}
-                                    value={cat.weight}
-                                    onChange={(e) => handleUpdateCategory(cat.id, "weight", Math.max(0, Number(e.target.value)))}
-                                    className="w-14 text-center text-sm font-bold border-2 border-gray-400 py-1 focus:outline-black"
-                                  />
-                                  <span className="text-sm">%</span>
+                              <div className="flex items-center gap-5">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-medium text-gray-500">Weight:</span>
+                                  <div className="relative">
+                                    <input
+                                      type="number"
+                                      value={cat.weight}
+                                      onChange={(e) => handleUpdateCategory(cat.id, "weight", Math.max(0, Number(e.target.value)))}
+                                      className="w-16 text-center text-sm font-medium text-gray-900 border border-gray-300 rounded-md py-1 pr-4 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm"
+                                    />
+                                    <span className="absolute right-2 top-1.5 text-xs text-gray-400 font-medium">%</span>
+                                  </div>
                                 </div>
 
                                 <div className="flex items-center gap-2">
-                                  <span className="text-sm font-bold text-gray-600">Avg:</span>
+                                  <span className="text-sm font-medium text-gray-500">Avg:</span>
                                   {cat.items && cat.items.length > 0 ? (
-                                    <div className="bg-gray-200 text-black font-bold text-sm py-1 px-3 border-2 border-gray-400">
+                                    <div className="bg-gray-100 text-gray-700 font-medium text-sm py-1 px-3 rounded-md border border-gray-200">
                                       {(
                                         Math.round(
                                           (cat.items.reduce((sum, i) => sum + i.score, 0) /
@@ -833,73 +823,76 @@ export default function GradeCheckerApp() {
                                     <div className="flex items-center gap-1">
                                       <input
                                         type="number"
-                                        id={`input-cat-score-${cat.id}`}
                                         value={cat.currentScore === null ? "" : cat.currentScore}
                                         onChange={(e) => {
                                           const val = e.target.value;
                                           handleUpdateCategory(cat.id, "currentScore", val === "" ? null : Number(val));
                                         }}
-                                        className="w-16 text-center text-sm font-bold border-2 border-gray-400 py-1 focus:outline-black bg-white"
+                                        className="w-16 text-center text-sm font-medium text-gray-900 border border-gray-300 rounded-md py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm placeholder:text-gray-400"
                                         placeholder="TBD"
                                       />
-                                      {cat.currentScore !== null && <span>%</span>}
+                                      {cat.currentScore !== null && <span className="text-sm text-gray-400">%</span>}
                                     </div>
                                   )}
                                 </div>
 
                                 <button
-                                  id={`btn-delete-cat-${cat.id}`}
                                   onClick={() => handleDeleteCategory(cat.id)}
-                                  className="p-1.5 border-2 border-red-200 bg-red-50 text-red-600 hover:bg-red-100 cursor-pointer"
+                                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
+                                  title="Delete Category"
                                 >
-                                  <Trash2 size={16} />
+                                  <Trash2 size={18} />
                                 </button>
                               </div>
                             </div>
 
+                            {/* Nested Items details */}
                             {cat.isExpanded && (
-                              <div className="mt-4 ml-8 pl-4 border-l-4 border-gray-300 space-y-3 bg-gray-50 p-3" id={`expanded-cat-items-${cat.id}`}>
+                              <div className="mt-4 ml-8 pl-4 border-l-2 border-gray-200 space-y-3 bg-gray-50 p-4 rounded-lg">
                                 <div className="flex justify-between items-center mb-2">
-                                  <span className="text-xs font-bold text-gray-600 uppercase">Individual Items</span>
+                                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Individual Assignments</span>
                                   <button
-                                    id={`btn-add-nested-${cat.id}`}
                                     onClick={() => handleAddNestedItem(cat.id)}
-                                    className="flex items-center gap-1 text-xs font-bold bg-gray-200 border border-gray-400 px-2 py-1 hover:bg-gray-300 cursor-pointer"
+                                    className="flex items-center gap-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 px-2 py-1 rounded hover:bg-gray-100 transition-colors cursor-pointer shadow-sm"
                                   >
-                                    <PlusCircle size={12} /> Add
+                                    <PlusCircle size={12} />
+                                    <span>Add Item</span>
                                   </button>
                                 </div>
                                 {cat.items.length === 0 ? (
-                                  <p className="text-sm text-gray-500">No items added.</p>
+                                  <p className="text-sm text-gray-400 italic">No specific assignments logged. Average is manually set above.</p>
                                 ) : (
                                   <div className="space-y-2">
                                     {cat.items.map((item) => (
-                                      <div key={item.id} className="flex items-center gap-3">
+                                      <div key={item.id} className="flex flex-wrap sm:flex-nowrap items-center gap-3">
                                         <input
                                           type="text"
                                           value={item.name}
                                           onChange={(e) => handleUpdateNestedItem(cat.id, item.id, "name", e.target.value)}
-                                          className="text-sm border-b border-gray-400 bg-transparent focus:outline-none py-1 flex-1"
-                                          placeholder="Item"
+                                          className="text-sm text-gray-700 border-b border-gray-300 bg-transparent hover:border-gray-400 focus:border-blue-500 focus:outline-none py-1 w-full sm:w-auto flex-1"
+                                          placeholder="Item Name"
                                         />
-                                        <input
-                                          type="number"
-                                          value={item.score}
-                                          onChange={(e) => handleUpdateNestedItem(cat.id, item.id, "score", Math.max(0, Number(e.target.value)))}
-                                          className="w-14 text-center text-sm font-bold border-2 border-gray-400 py-1 focus:outline-black"
-                                        />
-                                        <span className="font-bold text-gray-500">/</span>
-                                        <input
-                                          type="number"
-                                          value={item.maxScore}
-                                          onChange={(e) => handleUpdateNestedItem(cat.id, item.id, "maxScore", Math.max(1, Number(e.target.value)))}
-                                          className="w-14 text-center text-sm font-bold border-2 border-gray-400 py-1 focus:outline-black"
-                                        />
+                                        <div className="flex items-center gap-2">
+                                          <input
+                                            type="number"
+                                            value={item.score}
+                                            onChange={(e) => handleUpdateNestedItem(cat.id, item.id, "score", Math.max(0, Number(e.target.value)))}
+                                            className="w-16 text-center text-sm font-medium border border-gray-300 rounded py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-sm"
+                                          />
+                                          <span className="text-sm font-medium text-gray-400">/</span>
+                                          <input
+                                            type="number"
+                                            value={item.maxScore}
+                                            onChange={(e) => handleUpdateNestedItem(cat.id, item.id, "maxScore", Math.max(1, Number(e.target.value)))}
+                                            className="w-16 text-center text-sm font-medium border border-gray-300 rounded py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-sm"
+                                          />
+                                        </div>
                                         <button
                                           onClick={() => handleDeleteNestedItem(cat.id, item.id)}
-                                          className="text-red-500 hover:bg-red-50 p-1 border border-transparent hover:border-red-200"
+                                          className="text-gray-400 hover:text-red-500 p-1.5 rounded-md hover:bg-red-50 transition-colors"
+                                          title="Remove Item"
                                         >
-                                          <X size={14} />
+                                          <X size={16} />
                                         </button>
                                       </div>
                                     ))}
@@ -912,9 +905,13 @@ export default function GradeCheckerApp() {
                       )}
                       
                       {weightedCategories.length > 0 && (
-                        <div className="px-6 py-3 bg-gray-200 flex items-center justify-between text-sm font-bold border-t-2 border-gray-400">
-                          <span>Total Assigned Weights:</span>
-                          <span className={weightedCategories.reduce((sum, cat) => sum + cat.weight, 0) === 100 ? "text-green-700" : "text-red-600"}>
+                        <div className="px-6 py-4 bg-gray-50 flex items-center justify-between text-sm border-t border-gray-200">
+                          <span className="text-gray-600 font-medium">Total Assigned Weight:</span>
+                          <span className={`font-semibold ${
+                            weightedCategories.reduce((sum, cat) => sum + cat.weight, 0) === 100
+                              ? "text-green-700"
+                              : "text-amber-600"
+                          }`}>
                             {weightedCategories.reduce((sum, cat) => sum + cat.weight, 0)}% / 100%
                           </span>
                         </div>
@@ -926,51 +923,58 @@ export default function GradeCheckerApp() {
                   {gradingMode === "points" && (
                     <div className="p-4 sm:p-6">
                       {pointsAssignments.length === 0 ? (
-                        <div className="p-8 text-center text-gray-600 font-bold">No assignments added.</div>
+                        <div className="p-10 text-center text-gray-500">
+                          <p className="font-medium text-gray-600">No assignments added yet.</p>
+                          <p className="text-sm mt-1">Add assignments manually or use AI syllabus import.</p>
+                        </div>
                       ) : (
                         <div className="space-y-4">
-                          <div className="grid grid-cols-12 gap-3 pb-2 text-xs font-bold text-gray-500 uppercase border-b-2 border-gray-200">
-                            <div className="col-span-5">Name</div>
-                            <div className="col-span-3 text-center">Score</div>
-                            <div className="col-span-2 text-center">Done?</div>
-                            <div className="col-span-2 text-center">Del</div>
+                          <div className="grid grid-cols-12 gap-3 pb-3 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-200">
+                            <div className="col-span-5">Assignment Title</div>
+                            <div className="col-span-3 text-center">Score / Max</div>
+                            <div className="col-span-2 text-center">Graded?</div>
+                            <div className="col-span-2 text-center">Remove</div>
                           </div>
                           {pointsAssignments.map((a) => (
-                            <div key={a.id} className="grid grid-cols-12 gap-3 items-center">
+                            <div key={a.id} className="grid grid-cols-12 gap-3 items-center py-1">
                               <div className="col-span-5">
                                 <input
                                   type="text"
                                   value={a.name}
                                   onChange={(e) => handleUpdatePointAssignment(a.id, "name", e.target.value)}
-                                  className="w-full text-sm font-bold border-b border-gray-400 bg-transparent focus:outline-none py-1"
+                                  className="w-full text-sm font-medium text-gray-800 border-b border-gray-300 bg-transparent focus:border-blue-500 focus:outline-none py-1"
                                 />
                               </div>
-                              <div className="col-span-3 flex justify-center items-center gap-1">
+                              <div className="col-span-3 flex justify-center items-center gap-1.5">
                                 {a.completed ? (
                                   <>
                                     <input
                                       type="number"
                                       value={a.score}
                                       onChange={(e) => handleUpdatePointAssignment(a.id, "score", Math.max(0, Number(e.target.value)))}
-                                      className="w-14 text-center text-sm font-bold border-2 border-gray-400 py-1"
+                                      className="w-16 text-center text-sm font-medium border border-gray-300 rounded py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-sm"
                                     />
-                                    <span className="font-bold">/</span>
+                                    <span className="text-gray-400 font-medium">/</span>
                                   </>
                                 ) : (
-                                  <span className="text-xs font-bold bg-gray-200 px-2 py-1 mr-1">TBD</span>
+                                  <span className="text-xs font-medium bg-gray-100 text-gray-500 px-2 py-1.5 rounded mr-1 border border-gray-200">
+                                    Pending
+                                  </span>
                                 )}
                                 <input
                                   type="number"
                                   value={a.total}
                                   onChange={(e) => handleUpdatePointAssignment(a.id, "total", Math.max(1, Number(e.target.value)))}
-                                  className="w-14 text-center text-sm font-bold border-2 border-gray-400 py-1"
+                                  className="w-16 text-center text-sm font-medium border border-gray-300 rounded py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-sm"
                                 />
                               </div>
                               <div className="col-span-2 flex justify-center">
                                 <button
                                   onClick={() => handleUpdatePointAssignment(a.id, "completed", !a.completed)}
-                                  className={`w-6 h-6 flex items-center justify-center border-2 transition-all cursor-pointer ${
-                                    a.completed ? "bg-black border-black text-white" : "bg-white border-gray-400 text-transparent"
+                                  className={`w-6 h-6 flex items-center justify-center rounded border shadow-sm transition-colors cursor-pointer ${
+                                    a.completed 
+                                      ? "bg-blue-600 border-blue-600 text-white hover:bg-blue-700" 
+                                      : "bg-white border-gray-300 text-transparent hover:bg-gray-50"
                                   }`}
                                 >
                                   <Check size={14} strokeWidth={3} />
@@ -979,7 +983,7 @@ export default function GradeCheckerApp() {
                               <div className="col-span-2 flex justify-center">
                                 <button
                                   onClick={() => handleDeletePointAssignment(a.id)}
-                                  className="p-1 border-2 border-red-200 text-red-600 bg-red-50 hover:bg-red-100"
+                                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
                                 >
                                   <Trash2 size={16} />
                                 </button>
@@ -996,58 +1000,62 @@ export default function GradeCheckerApp() {
 
             {/* Calculations Column */}
             <div className="lg:col-span-5 space-y-6">
-              {/* CURRENT GRADE SUMMARY */}
-              <div className="bg-white p-6 border-2 border-gray-400 space-y-6">
+              {/* SUMMARY CARD */}
+              <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-6">
                 <div className="flex justify-between items-start">
                   <div>
-                    <h4 className="font-bold text-sm text-gray-500 uppercase">Current Standing</h4>
-                    <p className="text-4xl font-bold text-black mt-2">
+                    <h4 className="font-semibold text-xs text-gray-500 uppercase tracking-wide">Current Standing</h4>
+                    <p className="text-4xl font-bold text-gray-900 mt-1">
                       {((gradingMode === "weighted" ? weightedCategories.length : pointsAssignments.length) === 0)
                         ? "—"
                         : `${currentGradeResults.currentOverallGrade}%`}
                     </p>
                   </div>
-                  <div className="bg-gray-200 p-2 border-2 border-gray-400">
-                    <TrendingUp size={24} className="text-black" />
+                  <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-200 text-gray-600">
+                    <TrendingUp size={20} />
                   </div>
                 </div>
 
-                <div className="border-t-2 border-gray-200 pt-4 space-y-4">
-                  <div className="flex justify-between items-center text-sm font-bold">
-                    <span>Desired Class Grade:</span>
-                    <span>{desiredGrade}%</span>
+                <div className="border-t border-gray-100 pt-5 space-y-4">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-600 font-medium">Desired Target Grade:</span>
+                    <span className="font-semibold text-gray-900">{desiredGrade}%</span>
                   </div>
 
                   {((gradingMode === "weighted" ? weightedCategories.length : pointsAssignments.length) === 0) ? (
-                    <div className="p-4 bg-gray-100 border-2 border-gray-300 text-sm font-bold">
-                      Add assignments to calculate your standing.
+                    <div className="p-4 rounded-lg bg-gray-50 border border-gray-200 text-gray-500 text-sm flex gap-2">
+                      <Info size={18} className="shrink-0 text-gray-400" />
+                      <span>Add assignments or categories to view your required score projections.</span>
                     </div>
                   ) : currentGradeResults.requiredScoreOnPending !== null ? (
-                    <div className="p-4 bg-white border-2 border-black space-y-2">
-                      <h4 className="text-xs font-bold uppercase bg-black text-white inline-block px-2 py-1">Verdict</h4>
-                      <p className="text-sm font-bold mt-2">
-                        To achieve <span className="bg-yellow-200 px-1">{desiredGrade}%</span>, you need an average of{" "}
-                        <span className="bg-yellow-200 px-1">{currentGradeResults.requiredScoreOnPending}%</span> on the remaining{" "}
+                    <div className="p-4 rounded-lg bg-blue-50 border border-blue-100 space-y-2">
+                      <h4 className="text-xs font-semibold uppercase text-blue-800 tracking-wide">Required Target</h4>
+                      <p className="text-sm font-medium text-blue-900 leading-relaxed">
+                        To achieve an overall grade of <strong>{desiredGrade}%</strong>, you need to average at least{" "}
+                        <strong className="text-lg bg-blue-200 px-1.5 rounded">{currentGradeResults.requiredScoreOnPending}%</strong> on your remaining{" "}
                         {gradingMode === "weighted"
-                          ? `weight (${(currentGradeResults as any).pendingWeight}%)`
-                          : `assignments (${(currentGradeResults as any).pendingPoints} pts)`}
+                          ? `pending weight (${(currentGradeResults as any).pendingWeight}%)`
+                          : `pending assignments (${(currentGradeResults as any).pendingPoints} pts)`}
                         .
                       </p>
                     </div>
                   ) : (
-                    <div className="p-4 bg-green-100 border-2 border-green-400 font-bold text-green-800 text-sm flex gap-2">
-                      <Check size={18} />
-                      Course is fully evaluated. Final grade!
+                    <div className="p-4 rounded-lg bg-green-50 border border-green-200 text-green-800 text-sm font-medium flex gap-2">
+                      <Check size={18} className="shrink-0" />
+                      <span>All coursework is graded. This is your final course grade!</span>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* GRAPH PROJECTION */}
-              <div className="bg-white p-6 border-2 border-gray-400 space-y-4">
-                <h4 className="font-bold text-black text-lg border-b-2 border-gray-200 pb-2">Projection Curve</h4>
+              {/* GRAPH CARD */}
+              <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4">
+                <div className="border-b border-gray-100 pb-3">
+                  <h4 className="font-semibold text-gray-800">Score Projection Curve</h4>
+                  <p className="text-xs text-gray-500 mt-1">Visualizes potential final grades based on remaining coursework.</p>
+                </div>
                 
-                <div className="relative border-2 border-gray-400 p-2 bg-gray-50">
+                <div className="relative border border-gray-200 rounded-lg p-2 bg-gray-50">
                   <svg
                     viewBox={`0 0 ${graphWidth} ${graphHeight}`}
                     className="w-full h-auto overflow-visible"
@@ -1059,10 +1067,10 @@ export default function GradeCheckerApp() {
                         <g key={percent}>
                           <line
                             x1={graphPadding.left} y1={y} x2={graphWidth - graphPadding.right} y2={y}
-                            stroke="#d1d5db" strokeWidth="1" strokeDasharray="4 4"
+                            stroke="#cbd5e1" strokeWidth="1" strokeDasharray="4 4"
                           />
                           <text
-                            x={graphPadding.left - 5} y={y + 4} textAnchor="end" fontSize="10" className="font-bold fill-gray-500"
+                            x={graphPadding.left - 8} y={y + 4} textAnchor="end" fontSize="10" className="font-medium fill-gray-500"
                           >
                             {percent}%
                           </text>
@@ -1075,29 +1083,29 @@ export default function GradeCheckerApp() {
                         <line
                           x1={graphPadding.left} y1={getSvgCoords(0, desiredGrade).y}
                           x2={graphWidth - graphPadding.right} y2={getSvgCoords(100, desiredGrade).y}
-                          stroke="#000" strokeWidth="2" strokeDasharray="6 4"
+                          stroke="#ef4444" strokeWidth="1.5" strokeDasharray="5 3"
                         />
                         <text
                           x={graphWidth - graphPadding.right - 5} y={getSvgCoords(0, desiredGrade).y - 8}
-                          textAnchor="end" fontSize="10" className="font-bold fill-black uppercase bg-white"
+                          textAnchor="end" fontSize="10" className="font-semibold fill-red-600 uppercase"
                         >
-                          Goal: {desiredGrade}%
+                          Target: {desiredGrade}%
                         </text>
                       </g>
                     )}
 
-                    <path d={fillD} fill="#e5e7eb" />
-                    <path d={pathD} fill="none" stroke="#000" strokeWidth="3" />
+                    <path d={fillD} fill="#e2e8f0" opacity="0.5" />
+                    <path d={pathD} fill="none" stroke="#3b82f6" strokeWidth="2.5" />
 
                     {isTargetVisible && targetCoords && (
                       <g>
                         <line
                           x1={targetCoords.x} y1={targetCoords.y} x2={targetCoords.x} y2={getSvgCoords(0, 0).y}
-                          stroke="#000" strokeWidth="2" strokeDasharray="4 4"
+                          stroke="#64748b" strokeWidth="1.5" strokeDasharray="4 4"
                         />
-                        <circle cx={targetCoords.x} cy={targetCoords.y} r="6" className="fill-white stroke-black stroke-2" />
+                        <circle cx={targetCoords.x} cy={targetCoords.y} r="5" className="fill-white stroke-blue-600 stroke-2" />
                         <text
-                          x={targetCoords.x} y={getSvgCoords(0, 0).y + 14} textAnchor="middle" fontSize="12" className="font-bold fill-black bg-white"
+                          x={targetCoords.x} y={getSvgCoords(0, 0).y + 14} textAnchor="middle" fontSize="11" className="font-bold fill-gray-800"
                         >
                           {targetRequiredScore}%
                         </text>
@@ -1106,9 +1114,9 @@ export default function GradeCheckerApp() {
 
                     {points.map((p, index) => (
                       <circle
-                        key={index} cx={p.svgX} cy={p.svgY} r="10" fill="transparent" className="cursor-crosshair"
+                        key={index} cx={p.svgX} cy={p.svgY} r="12" fill="transparent" className="cursor-crosshair"
                         onMouseEnter={() =>
-                          setHoveredPoint({ x: p.svgX, y: p.svgY, labelX: `Pending avg: ${p.xVal}%`, labelY: `Final: ${Math.round(p.yVal * 10) / 10}%` })
+                          setHoveredPoint({ x: p.svgX, y: p.svgY, labelX: `Avg on remaining: ${p.xVal}%`, labelY: `Final Grade: ${Math.round(p.yVal * 10) / 10}%` })
                         }
                         onMouseLeave={() => setHoveredPoint(null)}
                       />
@@ -1116,11 +1124,11 @@ export default function GradeCheckerApp() {
 
                     <line
                       x1={graphPadding.left} y1={getSvgCoords(0, 0).y} x2={graphWidth - graphPadding.right} y2={getSvgCoords(100, 0).y}
-                      stroke="#000" strokeWidth="2"
+                      stroke="#94a3b8" strokeWidth="1.5"
                     />
                     <line
                       x1={graphPadding.left} y1={graphPadding.top} x2={graphPadding.left} y2={getSvgCoords(0, 0).y}
-                      stroke="#000" strokeWidth="2"
+                      stroke="#94a3b8" strokeWidth="1.5"
                     />
 
                     {[0, 25, 50, 75, 100].map((val) => {
@@ -1128,8 +1136,8 @@ export default function GradeCheckerApp() {
                       const { y } = getSvgCoords(0, 0);
                       return (
                         <g key={val}>
-                          <line x1={x} y1={y} x2={x} y2={y + 5} stroke="#000" strokeWidth="2" />
-                          <text x={x} y={y + 16} textAnchor="middle" fontSize="10" className="font-bold fill-black">
+                          <line x1={x} y1={y} x2={x} y2={y + 5} stroke="#94a3b8" strokeWidth="1.5" />
+                          <text x={x} y={y + 18} textAnchor="middle" fontSize="10" className="font-medium fill-gray-600">
                             {val}%
                           </text>
                         </g>
@@ -1139,11 +1147,11 @@ export default function GradeCheckerApp() {
 
                   {hoveredPoint && (
                     <div
-                      className="absolute bg-white border-2 border-black p-2 text-xs font-bold z-10"
-                      style={{ left: `${hoveredPoint.x + 10}px`, top: `${hoveredPoint.y - 45}px` }}
+                      className="absolute bg-gray-900 text-white p-2 rounded-md shadow-md text-xs font-medium z-10 pointer-events-none"
+                      style={{ left: `${hoveredPoint.x + 15}px`, top: `${hoveredPoint.y - 45}px` }}
                     >
-                      <div>{hoveredPoint.labelY}</div>
-                      <div className="text-gray-600">{hoveredPoint.labelX}</div>
+                      <div className="font-bold mb-0.5">{hoveredPoint.labelY}</div>
+                      <div className="text-gray-300 text-[11px]">{hoveredPoint.labelX}</div>
                     </div>
                   )}
                 </div>
@@ -1162,76 +1170,79 @@ export default function GradeCheckerApp() {
             transition={{ duration: 0.15 }}
             className="grid grid-cols-1 lg:grid-cols-12 gap-6"
           >
-            {/* Scale Config */}
+            {/* Scale Config Column */}
             <div className="lg:col-span-4 space-y-6">
-              <div className="bg-white p-6 border-2 border-gray-400 space-y-4">
-                <div className="flex justify-between items-center border-b-2 border-gray-200 pb-2">
-                  <h3 className="font-bold text-black flex items-center gap-2">
-                    <Settings size={18} /> GPA Rules
+              <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-5">
+                <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+                  <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                    <Settings size={18} className="text-gray-500" /> GPA Grading Rules
                   </h3>
                   <button
                     onClick={() => setShowScaleConfig(!showScaleConfig)}
-                    className="text-xs font-bold text-blue-700 underline"
+                    className="text-xs font-medium text-blue-600 hover:text-blue-800 cursor-pointer"
                   >
-                    {showScaleConfig ? "Hide" : "Edit"}
+                    {showScaleConfig ? "Hide Grading Scale" : "Edit Grading Scale"}
                   </button>
                 </div>
 
-                <div className="space-y-3 pt-2">
-                  <span className="block text-sm font-bold text-black uppercase">Weight Boosts</span>
-                  <div className="grid grid-cols-3 gap-2">
+                <div className="space-y-3">
+                  <span className="block text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    Weighted Course Boosts
+                  </span>
+                  <div className="grid grid-cols-3 gap-3">
                     <div>
-                      <label className="block text-xs font-bold text-gray-600 mb-1">Honors</label>
+                      <label className="block text-xs text-gray-500 mb-1">Honors</label>
                       <input
                         type="number" step="0.1" min="0"
                         value={weightingConfig.honorsBoost}
                         onChange={(e) => saveWeightingConfig({ ...weightingConfig, honorsBoost: Number(e.target.value) })}
-                        className="w-full text-center font-bold border-2 border-gray-400 py-1"
+                        className="w-full text-center text-sm font-medium border border-gray-300 rounded-md py-1.5 focus:ring-1 focus:ring-blue-500 shadow-sm"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-600 mb-1">AP</label>
+                      <label className="block text-xs text-gray-500 mb-1">AP</label>
                       <input
                         type="number" step="0.1" min="0"
                         value={weightingConfig.apBoost}
                         onChange={(e) => saveWeightingConfig({ ...weightingConfig, apBoost: Number(e.target.value) })}
-                        className="w-full text-center font-bold border-2 border-gray-400 py-1"
+                        className="w-full text-center text-sm font-medium border border-gray-300 rounded-md py-1.5 focus:ring-1 focus:ring-blue-500 shadow-sm"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-600 mb-1">IB</label>
+                      <label className="block text-xs text-gray-500 mb-1">IB</label>
                       <input
                         type="number" step="0.1" min="0"
                         value={weightingConfig.ibBoost}
                         onChange={(e) => saveWeightingConfig({ ...weightingConfig, ibBoost: Number(e.target.value) })}
-                        className="w-full text-center font-bold border-2 border-gray-400 py-1"
+                        className="w-full text-center text-sm font-medium border border-gray-300 rounded-md py-1.5 focus:ring-1 focus:ring-blue-500 shadow-sm"
                       />
                     </div>
                   </div>
                 </div>
 
                 {showScaleConfig ? (
-                  <div className="pt-4 border-t-2 border-gray-200">
-                    <div className="max-h-60 overflow-y-auto space-y-2 border-2 border-gray-400 p-2 bg-gray-50">
+                  <div className="pt-4 border-t border-gray-100">
+                    <span className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Scale Editor</span>
+                    <div className="max-h-60 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
                       {gpaRules.map((r) => (
-                        <div key={r.grade} className="flex items-center justify-between gap-2 border-b border-gray-300 pb-2">
-                          <span className="w-10 font-bold text-black">{r.grade}</span>
-                          <div className="flex items-center gap-1">
-                            <span className="text-xs font-bold">Pts:</span>
+                        <div key={r.grade} className="flex items-center justify-between gap-3 bg-gray-50 p-2 rounded border border-gray-200">
+                          <span className="w-8 font-bold text-gray-700 text-sm">{r.grade}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-500">Pts:</span>
                             <input
                               type="number" step="0.05" min="0" max="5"
                               value={r.points}
                               onChange={(e) => handleUpdateGPAScaleRule(r.grade, "points", Number(e.target.value))}
-                              className="w-16 text-center font-bold border-2 border-gray-400 py-1"
+                              className="w-16 text-center text-sm font-medium border border-gray-300 rounded py-1 shadow-sm"
                             />
                           </div>
-                          <div className="flex items-center gap-1">
-                            <span className="text-xs font-bold">Min%:</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-500">Min %:</span>
                             <input
                               type="number" min="0" max="100"
                               value={r.minPercent}
                               onChange={(e) => handleUpdateGPAScaleRule(r.grade, "minPercent", Number(e.target.value))}
-                              className="w-14 text-center font-bold border-2 border-gray-400 py-1"
+                              className="w-16 text-center text-sm font-medium border border-gray-300 rounded py-1 shadow-sm"
                             />
                           </div>
                         </div>
@@ -1239,12 +1250,13 @@ export default function GradeCheckerApp() {
                     </div>
                   </div>
                 ) : (
-                  <div className="pt-4 border-t-2 border-gray-200">
-                    <div className="grid grid-cols-4 gap-2 text-center">
+                  <div className="pt-4 border-t border-gray-100">
+                    <span className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Scale Preview</span>
+                    <div className="grid grid-cols-4 gap-2">
                       {gpaRules.slice(0, 8).map((r) => (
-                        <div key={r.grade} className="bg-gray-100 p-2 border-2 border-gray-300">
-                          <div className="font-bold text-black">{r.grade}</div>
-                          <div className="text-xs font-bold text-gray-500">{r.points}</div>
+                        <div key={r.grade} className="bg-gray-50 p-2 rounded-lg border border-gray-200 flex flex-col items-center">
+                          <span className="font-semibold text-gray-800 text-sm">{r.grade}</span>
+                          <span className="text-xs text-gray-500 mt-0.5">{r.points} pt</span>
                         </div>
                       ))}
                     </div>
@@ -1253,65 +1265,68 @@ export default function GradeCheckerApp() {
               </div>
             </div>
 
-            {/* GPA Courses */}
+            {/* GPA Courses Column */}
             <div className="lg:col-span-8 space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 bg-white p-6 border-2 border-gray-400">
-                <div className="flex flex-col items-center justify-center p-6 border-2 border-gray-400 bg-gray-100">
-                  <h4 className="font-bold text-sm uppercase">Unweighted</h4>
-                  <p className="text-5xl font-bold text-black mt-2">{gpaResult.unweightedGPA.toFixed(2)}</p>
+              {/* Stats Card */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                <div className="flex flex-col items-center justify-center p-6 border border-gray-200 bg-gray-50 rounded-xl">
+                  <h4 className="font-semibold text-xs text-gray-500 uppercase tracking-wide">Unweighted GPA</h4>
+                  <p className="text-5xl font-bold text-gray-900 mt-2">{gpaResult.unweightedGPA.toFixed(2)}</p>
                 </div>
-                <div className="flex flex-col items-center justify-center p-6 border-4 border-black bg-white">
-                  <h4 className="font-bold text-sm uppercase text-black">Weighted</h4>
-                  <p className="text-5xl font-bold text-black mt-2">{gpaResult.weightedGPA.toFixed(2)}</p>
-                  <span className="text-xs font-bold mt-2 bg-black text-white px-2 py-1">Credits: {gpaResult.totalCredits}</span>
+                <div className="flex flex-col items-center justify-center p-6 border border-blue-200 bg-blue-50 rounded-xl relative overflow-hidden shadow-inner">
+                  <h4 className="font-semibold text-xs text-blue-700 uppercase tracking-wide">Weighted GPA</h4>
+                  <p className="text-5xl font-bold text-blue-900 mt-2">{gpaResult.weightedGPA.toFixed(2)}</p>
+                  <span className="text-xs font-medium mt-3 bg-white border border-blue-200 text-blue-800 px-3 py-1 rounded-full shadow-sm">
+                    {gpaResult.totalCredits} Total Credits
+                  </span>
                 </div>
               </div>
 
-              <div className="bg-white border-2 border-gray-400">
-                <div className="px-6 py-4 border-b-2 border-gray-400 flex justify-between items-center bg-gray-100">
-                  <h3 className="font-bold text-black text-lg">Semester Courses</h3>
+              {/* Course List Card */}
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                  <h3 className="font-semibold text-gray-800">Semester Course List</h3>
                   <div className="flex gap-2">
                     <button
                       onClick={handleAddGPACourse}
-                      className="flex items-center gap-1 px-3 py-1 font-bold border-2 border-black bg-white hover:bg-gray-200"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm transition-colors cursor-pointer"
                     >
-                      <Plus size={14} /> Add
-                    </button>
-                    <button
-                      onClick={resetGPAData}
-                      className="p-1 border-2 border-gray-400 bg-white hover:bg-gray-200"
-                    >
-                      <RotateCcw size={16} />
+                      <Plus size={16} /> <span>Add New Course</span>
                     </button>
                   </div>
                 </div>
 
                 <div className="p-4 sm:p-6">
                   {gpaCourses.length === 0 ? (
-                    <div className="text-center font-bold text-gray-600 p-8">No courses added.</div>
+                    <div className="text-center p-10">
+                      <p className="font-medium text-gray-600">No courses mapped out yet.</p>
+                      <p className="text-sm text-gray-500 mt-1">Click "Add New Course" to start planning your GPA.</p>
+                    </div>
                   ) : (
                     <div className="space-y-4">
-                      <div className="grid grid-cols-12 gap-3 pb-2 text-xs font-bold text-black uppercase border-b-2 border-black">
-                        <div className="col-span-5">Course</div>
+                      <div className="grid grid-cols-12 gap-3 pb-3 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-200">
+                        <div className="col-span-5">Course Title</div>
                         <div className="col-span-3">Level</div>
-                        <div className="col-span-2 text-center">Creds</div>
+                        <div className="col-span-2 text-center">Credits</div>
                         <div className="col-span-2 text-center">Grade</div>
                       </div>
 
                       {gpaCourses.map((c) => (
-                        <div key={c.id} className="grid grid-cols-12 gap-3 items-center">
-                          <div className="col-span-5 flex items-center gap-2">
+                        <div key={c.id} className="grid grid-cols-12 gap-3 items-center py-1">
+                          <div className="col-span-5 flex items-center gap-3">
                             <button
                               onClick={() => handleDeleteGPACourse(c.id)}
-                              className="p-1 border-2 border-red-200 bg-red-50 text-red-600 hover:bg-red-100"
+                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors cursor-pointer shrink-0"
+                              title="Remove Course"
                             >
-                              <Trash2 size={14} />
+                              <Trash2 size={16} />
                             </button>
                             <input
                               type="text"
                               value={c.name}
                               onChange={(e) => handleUpdateGPACourse(c.id, "name", e.target.value)}
-                              className="w-full font-bold border-b-2 border-gray-300 focus:border-black focus:outline-none py-1"
+                              className="w-full text-sm font-medium text-gray-900 border-b border-gray-300 bg-transparent focus:border-blue-500 focus:outline-none py-1"
+                              placeholder="Course Name"
                             />
                           </div>
 
@@ -1319,7 +1334,7 @@ export default function GradeCheckerApp() {
                             <select
                               value={c.level}
                               onChange={(e) => handleUpdateGPACourse(c.id, "level", e.target.value)}
-                              className="w-full font-bold border-2 border-gray-400 p-1 focus:outline-none bg-white"
+                              className="w-full text-sm font-medium border border-gray-300 rounded-md p-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white shadow-sm"
                             >
                               <option value="Regular">Regular</option>
                               <option value="Honors">Honors</option>
@@ -1330,10 +1345,10 @@ export default function GradeCheckerApp() {
 
                           <div className="col-span-2">
                             <input
-                              type="number" min="1" max="10"
+                              type="number" min="1" max="10" step="0.5"
                               value={c.credits}
-                              onChange={(e) => handleUpdateGPACourse(c.id, "credits", Math.max(1, Number(e.target.value)))}
-                              className="w-full text-center font-bold border-2 border-gray-400 py-1"
+                              onChange={(e) => handleUpdateGPACourse(c.id, "credits", Math.max(0.5, Number(e.target.value)))}
+                              className="w-full text-center text-sm font-medium border border-gray-300 rounded-md py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-sm"
                             />
                           </div>
 
@@ -1341,7 +1356,7 @@ export default function GradeCheckerApp() {
                             <select
                               value={c.grade}
                               onChange={(e) => handleUpdateGPACourse(c.id, "grade", e.target.value)}
-                              className="w-full font-bold border-2 border-gray-400 p-1 focus:outline-none bg-white text-center"
+                              className="w-full text-sm font-semibold border border-gray-300 rounded-md p-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white text-center shadow-sm"
                             >
                               {gpaRules.map((rule) => (
                                 <option key={rule.grade} value={rule.grade}>{rule.grade}</option>
@@ -1359,66 +1374,74 @@ export default function GradeCheckerApp() {
         )}
       </AnimatePresence>
 
-      {/* AI DIALOG - Squared Off */}
+      {/* AI IMPORT DIALOG MODAL */}
       <AnimatePresence>
         {showImportDialog && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50"
+            className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50"
           >
             <motion.div
-              initial={{ scale: 0.95 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0.95 }}
-              className="bg-white border-4 border-black max-w-lg w-full"
+              initial={{ scale: 0.95, y: 10 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 10 }}
+              className="bg-white rounded-xl shadow-xl border border-gray-200 max-w-lg w-full overflow-hidden"
             >
-              <div className="px-6 py-4 border-b-4 border-black flex justify-between items-center bg-gray-100">
-                <h3 className="font-bold text-black flex items-center gap-2">
-                  <Sparkles size={18} /> AI Import
+              <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                  <Sparkles size={18} className="text-blue-600" /> Syllabus AI Importer
                 </h3>
                 <button
                   onClick={() => setShowImportDialog(false)}
-                  className="font-bold p-1 border-2 border-transparent hover:border-black"
+                  className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-md transition-colors"
                 >
                   <X size={20} />
                 </button>
               </div>
 
               <div className="p-6 space-y-4">
-                <p className="text-sm font-bold text-gray-700">
-                  Paste course syllabus details. The AI will extract the weights and grading scales automatically.
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  Paste sections from your course syllabus. The AI will automatically extract the grading framework, weights, categories, and scale.
                 </p>
 
                 <textarea
                   rows={6}
                   value={syllabusText}
                   onChange={(e) => setSyllabusText(e.target.value)}
-                  className="w-full text-sm p-3 border-2 border-black focus:outline-none resize-none font-mono bg-yellow-50"
-                  placeholder="Paste syllabus here..."
+                  className="w-full text-sm p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none bg-gray-50 placeholder:text-gray-400"
+                  placeholder="Example: Tests are 40%, Homework is 30%, Final is 30%. Grading: A > 92, B > 84..."
                 />
 
                 {parseError && (
-                  <div className="p-3 bg-red-100 border-2 border-red-500 font-bold text-red-700 text-sm">
-                    {parseError}
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700 flex gap-2 items-start">
+                    <Info size={16} className="shrink-0 mt-0.5" />
+                    <span>{parseError}</span>
                   </div>
                 )}
               </div>
 
-              <div className="px-6 py-4 bg-gray-100 border-t-4 border-black flex justify-end gap-4">
+              <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
                 <button
                   onClick={() => setShowImportDialog(false)}
-                  className="px-4 py-2 font-bold border-2 border-black bg-white hover:bg-gray-200"
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-100 rounded-md shadow-sm transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleParseSyllabus}
                   disabled={isParsing || !syllabusText.trim()}
-                  className="flex items-center gap-2 px-4 py-2 font-bold bg-blue-600 text-white border-2 border-black hover:bg-blue-700 disabled:bg-gray-400"
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent hover:bg-blue-700 disabled:bg-blue-300 rounded-md shadow-sm transition-colors disabled:cursor-not-allowed"
                 >
-                  {isParsing ? "Extracting..." : "Process"}
+                  {isParsing ? (
+                    <>
+                      <div className="h-4 w-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                      <span>Extracting Data...</span>
+                    </>
+                  ) : (
+                    "Extract Syllabus Data"
+                  )}
                 </button>
               </div>
             </motion.div>
