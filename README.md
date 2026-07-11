@@ -2,19 +2,8 @@
 <img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
 </div>
 
-# Run and deploy your AI Studio app
+# GPA/Grade Checker
+This project is a free open-source GPA/Grade checker for students to use. Students can input weight of subjects and potential grades to test possible outcomes.
 
-This contains everything you need to run your app locally.
-
-View your app in AI Studio: https://ai.studio/apps/c83ef132-41ce-47c3-8432-c9bc5cc09648
-
-## Run Locally
-
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+# Features
+The project includes graphs that depict waht is needed to reach the student's goals, as well as predictions based off potential inputs.
