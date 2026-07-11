@@ -826,7 +826,7 @@ export default function GradeCheckerApp() {
                                 </div>
 
                                 <div className="flex items-center gap-2">
-                                  <span className="text-sm font-medium text-gray-500">Avg:</span>
+                                  <span className="text-sm font-medium text-gray-500">Avg (Max=120%):</span>
                                   {cat.items && cat.items.length > 0 ? (
                                     <div className="bg-gray-100 text-gray-700 font-medium text-sm py-1 px-3 rounded-md border border-gray-200">
                                       {(
