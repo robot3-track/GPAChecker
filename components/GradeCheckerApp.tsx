@@ -18,7 +18,9 @@ import {
   Settings,
   PlusCircle,
   Sun,
-  Moon
+  Moon,
+  FolderOpen,
+  BookOpen
 } from "lucide-react";
 
 // Types
@@ -37,6 +39,17 @@ interface PointAssignment {
   score: number;
   total: number;
   completed: boolean;
+}
+
+interface Course {
+  id: string;
+  title: string;
+  gradingMode: "weighted" | "points";
+  desiredGrade: number;
+  weightedCategories: WeightedCategory[];
+  pointsAssignments: PointAssignment[];
+  credits: number;
+  courseLevel: "Regular" | "Honors" | "AP" | "IB";
 }
 
 interface GPACourse {
@@ -92,46 +105,50 @@ export default function GradeCheckerApp() {
     localStorage.setItem("gc_darkMode", String(darkMode));
   }, [darkMode]);
 
-  // --- CLASS GRADE CHECKER STATE ---
-  const [classTitle, setClassTitle] = useState<string>(() => {
+  // --- MULTI-COURSE DASHBOARD STATE ---
+  const [courses, setCourses] = useState<Course[]>(() => {
     if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("gc_classTitle");
+      const stored = localStorage.getItem("gc_courses");
+      if (stored) return JSON.parse(stored);
+    }
+    // Default fallback starter course
+    return [{
+      id: "default-course",
+      title: "Introduction to Calculus",
+      gradingMode: "weighted",
+      desiredGrade: 90,
+      weightedCategories: [
+        { id: "1", name: "Exams", weight: 50, currentScore: 85, isExpanded: false, items: [] },
+        { id: "2", name: "Homework", weight: 30, currentScore: 95, isExpanded: false, items: [] },
+        { id: "3", name: "Final Exam", weight: 20, currentScore: null, isExpanded: false, items: [] }
+      ],
+      pointsAssignments: [],
+      credits: 4,
+      courseLevel: "Regular"
+    }];
+  });
+
+  const [activeCourseId, setActiveCourseId] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("gc_activeCourseId");
       if (stored) return stored;
     }
-    return "";
+    return "default-course";
   });
 
-  const [desiredGrade, setDesiredGrade] = useState<number>(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("gc_desiredGrade");
-      if (stored) return Number(stored);
-    }
-    return 90;
-  });
+  // Keep tracking active course reference
+  const activeCourse = courses.find((c) => c.id === activeCourseId) || courses[0] || null;
 
-  const [gradingMode, setGradingMode] = useState<"weighted" | "points">((() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("gc_gradingMode");
-      if (stored) return stored as "weighted" | "points";
-    }
-    return "weighted";
-  })());
+  // Sync courses to localStorage
+  useEffect(() => {
+    localStorage.setItem("gc_courses", JSON.stringify(courses));
+  }, [courses]);
 
-  const [weightedCategories, setWeightedCategories] = useState<WeightedCategory[]>(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("gc_weightedCategories");
-      if (stored) return JSON.parse(stored);
+  useEffect(() => {
+    if (activeCourseId) {
+      localStorage.setItem("gc_activeCourseId", activeCourseId);
     }
-    return [];
-  });
-
-  const [pointsAssignments, setPointsAssignments] = useState<PointAssignment[]>(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("gc_pointsAssignments");
-      if (stored) return JSON.parse(stored);
-    }
-    return [];
-  });
+  }, [activeCourseId]);
 
   // --- GPA CHECKER STATE ---
   const [gpaRules, setGpaRules] = useState<GPAScaleRule[]>(() => {
@@ -175,65 +192,60 @@ export default function GradeCheckerApp() {
   // Graph Tooltip State
   const [hoveredPoint, setHoveredPoint] = useState<{ x: number; y: number; labelX: string; labelY: string } | null>(null);
 
-  // Save State Helpers
-  const saveClassTitle = (val: string) => {
-    setClassTitle(val);
-    localStorage.setItem("gc_classTitle", val);
+  // Helper updates for Active Course sub-state
+  const updateActiveCourse = (updater: (course: Course) => Course) => {
+    setCourses(prev => prev.map(c => c.id === activeCourseId ? updater(c) : c));
   };
 
-  const saveDesiredGrade = (val: number) => {
-    setDesiredGrade(val);
-    localStorage.setItem("gc_desiredGrade", String(val));
+  // --- COURSE CRUD ACTION HANDLERS ---
+  const handleAddNewCourse = () => {
+    const newId = Date.now().toString();
+    const newCourse: Course = {
+      id: newId,
+      title: `Course ${courses.length + 1}`,
+      gradingMode: "weighted",
+      desiredGrade: 90,
+      weightedCategories: [],
+      pointsAssignments: [],
+      credits: 3,
+      courseLevel: "Regular"
+    };
+    setCourses([...courses, newCourse]);
+    setActiveCourseId(newId);
   };
 
-  const saveGradingMode = (val: "weighted" | "points") => {
-    setGradingMode(val);
-    localStorage.setItem("gc_gradingMode", val);
-  };
-
-  const saveWeightedCategories = (val: WeightedCategory[]) => {
-    setWeightedCategories(val);
-    localStorage.setItem("gc_weightedCategories", JSON.stringify(val));
-  };
-
-  const savePointsAssignments = (val: PointAssignment[]) => {
-    setPointsAssignments(val);
-    localStorage.setItem("gc_pointsAssignments", JSON.stringify(val));
-  };
-
-  const saveGpaCourses = (val: GPACourse[]) => {
-    setGpaCourses(val);
-    localStorage.setItem("gc_gpaCourses", JSON.stringify(val));
-  };
-
-  const saveGpaRules = (val: GPAScaleRule[]) => {
-    setGpaRules(val);
-    localStorage.setItem("gc_gpaRules", JSON.stringify(val));
-  };
-
-  const saveWeightingConfig = (val: typeof weightingConfig) => {
-    setWeightingConfig(val);
-    localStorage.setItem("gc_weightingConfig", JSON.stringify(val));
-  };
-
-  const resetClassData = () => {
-    if (confirm("Are you sure you want to reset class data? This action cannot be undone.")) {
-      localStorage.removeItem("gc_classTitle");
-      localStorage.removeItem("gc_desiredGrade");
-      localStorage.removeItem("gc_gradingMode");
-      localStorage.removeItem("gc_weightedCategories");
-      localStorage.removeItem("gc_pointsAssignments");
-      window.location.reload();
+  const handleDeleteCourse = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (courses.length <= 1) {
+      alert("You must keep at least one course active in your dashboard!");
+      return;
+    }
+    if (confirm("Are you sure you want to delete this class? This cannot be undone.")) {
+      const updated = courses.filter((c) => c.id !== id);
+      setCourses(updated);
+      if (activeCourseId === id) {
+        setActiveCourseId(updated[0].id);
+      }
     }
   };
 
-  // --- MATH CALCULATIONS ---
-  const calculateWeightedGrade = () => {
+  const resetClassData = () => {
+    if (confirm("Are you sure you want to completely clear current course progress? This will reset assignments and categories.")) {
+      updateActiveCourse((course) => ({
+        ...course,
+        weightedCategories: [],
+        pointsAssignments: []
+      }));
+    }
+  };
+
+  // --- DETAILED CALCULATIONS ---
+  const calculateWeightedGrade = (course: Course) => {
     let totalWeight = 0;
     let earnedWeightContribution = 0;
     let pendingWeight = 0;
 
-    weightedCategories.forEach((cat) => {
+    course.weightedCategories.forEach((cat) => {
       let catScore = cat.currentScore;
 
       if (cat.items && cat.items.length > 0) {
@@ -254,7 +266,7 @@ export default function GradeCheckerApp() {
 
     let requiredScoreOnPending = null;
     if (pendingWeight > 0) {
-      requiredScoreOnPending = ((desiredGrade - earnedWeightContribution) / pendingWeight) * 100;
+      requiredScoreOnPending = ((course.desiredGrade - earnedWeightContribution) / pendingWeight) * 100;
     }
 
     const finalRequired = requiredScoreOnPending !== null ? Math.min(120, Math.round(requiredScoreOnPending * 100) / 100) : null;
@@ -269,9 +281,9 @@ export default function GradeCheckerApp() {
     };
   };
 
-  const calculatePointsGrade = () => {
-    const completedAssignments = pointsAssignments.filter((a) => a.completed);
-    const pendingAssignments = pointsAssignments.filter((a) => !a.completed);
+  const calculatePointsGrade = (course: Course) => {
+    const completedAssignments = course.pointsAssignments.filter((a) => a.completed);
+    const pendingAssignments = course.pointsAssignments.filter((a) => !a.completed);
 
     const earnedPoints = completedAssignments.reduce((sum, a) => sum + a.score, 0);
     const maxCompletedPoints = completedAssignments.reduce((sum, a) => sum + a.total, 0);
@@ -280,7 +292,7 @@ export default function GradeCheckerApp() {
     const totalPossiblePoints = maxCompletedPoints + pendingPoints;
     const currentOverallGrade = maxCompletedPoints > 0 ? (earnedPoints / maxCompletedPoints) * 100 : 100;
 
-    const totalPointsNeeded = (desiredGrade / 100) * totalPossiblePoints;
+    const totalPointsNeeded = (course.desiredGrade / 100) * totalPossiblePoints;
     const remainingPointsNeeded = totalPointsNeeded - earnedPoints;
 
     let requiredScoreOnPending = null;
@@ -301,7 +313,31 @@ export default function GradeCheckerApp() {
     };
   };
 
-  const currentGradeResults = gradingMode === "weighted" ? calculateWeightedGrade() : calculatePointsGrade();
+  const currentGradeResults = activeCourse
+    ? (activeCourse.gradingMode === "weighted" ? calculateWeightedGrade(activeCourse) : calculatePointsGrade(activeCourse))
+    : { currentOverallGrade: 0, requiredScoreOnPending: null };
+
+  // Sync dashboard active courses instantly into GPA Planner List
+  const syncDashboardToGpa = () => {
+    const synced: GPACourse[] = courses.map((c) => {
+      const stats = c.gradingMode === "weighted" ? calculateWeightedGrade(c) : calculatePointsGrade(c);
+      const percent = stats.currentOverallGrade;
+      
+      // Determine letter grade from percentage
+      const matchingRule = gpaRules.find((rule) => percent >= rule.minPercent) || gpaRules[gpaRules.length - 1];
+      
+      return {
+        id: c.id,
+        name: c.title,
+        credits: c.credits,
+        grade: matchingRule ? matchingRule.grade : "A",
+        level: c.courseLevel
+      };
+    });
+    setGpaCourses(synced);
+    localStorage.setItem("gc_gpaCourses", JSON.stringify(synced));
+    alert("Successfully synced all dashboard courses with your GPA planner!");
+  };
 
   const calculateGPA = () => {
     let totalCredits = 0;
@@ -332,8 +368,9 @@ export default function GradeCheckerApp() {
 
   const gpaResult = calculateGPA();
 
-  // --- HANDLERS ---
+  // --- ASSIGNMENT & CATEGORY MODIFY HANDLERS ---
   const handleAddCategory = () => {
+    if (!activeCourse) return;
     const newCat: WeightedCategory = {
       id: Date.now().toString(),
       name: "New Category",
@@ -342,66 +379,69 @@ export default function GradeCheckerApp() {
       isExpanded: false,
       items: [],
     };
-    saveWeightedCategories([...weightedCategories, newCat]);
+    updateActiveCourse(c => ({ ...c, weightedCategories: [...c.weightedCategories, newCat] }));
   };
 
   const handleDeleteCategory = (id: string) => {
-    saveWeightedCategories(weightedCategories.filter((cat) => cat.id !== id));
+    updateActiveCourse(c => ({
+      ...c,
+      weightedCategories: c.weightedCategories.filter((cat) => cat.id !== id)
+    }));
   };
 
   const handleUpdateCategory = (id: string, field: keyof WeightedCategory, value: any) => {
-    const updated = weightedCategories.map((cat) => {
-      if (cat.id === id) {
-        return { ...cat, [field]: value };
-      }
-      return cat;
-    });
-    saveWeightedCategories(updated);
+    updateActiveCourse(c => ({
+      ...c,
+      weightedCategories: c.weightedCategories.map((cat) => cat.id === id ? { ...cat, [field]: value } : cat)
+    }));
   };
 
   const handleAddNestedItem = (catId: string) => {
-    const updated = weightedCategories.map((cat) => {
-      if (cat.id === catId) {
-        return {
-          ...cat,
-          items: [
-            ...cat.items,
-            { id: Date.now().toString(), name: `Assignment ${cat.items.length + 1}`, score: 10, maxScore: 10 },
-          ],
-        };
-      }
-      return cat;
-    });
-    saveWeightedCategories(updated);
+    updateActiveCourse(c => ({
+      ...c,
+      weightedCategories: c.weightedCategories.map((cat) => {
+        if (cat.id === catId) {
+          return {
+            ...cat,
+            items: [
+              ...cat.items,
+              { id: Date.now().toString(), name: `Assignment ${cat.items.length + 1}`, score: 10, maxScore: 10 },
+            ],
+          };
+        }
+        return cat;
+      })
+    }));
   };
 
   const handleUpdateNestedItem = (catId: string, itemId: string, field: string, value: any) => {
-    const updated = weightedCategories.map((cat) => {
-      if (cat.id === catId) {
-        const updatedItems = cat.items.map((item) => {
-          if (item.id === itemId) {
-            return { ...item, [field]: value };
-          }
-          return item;
-        });
-        return { ...cat, items: updatedItems };
-      }
-      return cat;
-    });
-    saveWeightedCategories(updated);
+    updateActiveCourse(c => ({
+      ...c,
+      weightedCategories: c.weightedCategories.map((cat) => {
+        if (cat.id === catId) {
+          const updatedItems = cat.items.map((item) => {
+            if (item.id === itemId) {
+              return { ...item, [field]: value };
+            }
+            return item;
+          });
+          return { ...cat, items: updatedItems };
+        }
+        return cat;
+      })
+    }));
   };
 
   const handleDeleteNestedItem = (catId: string, itemId: string) => {
-    const updated = weightedCategories.map((cat) => {
-      if (cat.id === catId) {
-        return {
-          ...cat,
-          items: cat.items.filter((item) => item.id !== itemId),
-        };
-      }
-      return cat;
-    });
-    saveWeightedCategories(updated);
+    updateActiveCourse(c => ({
+      ...c,
+      weightedCategories: c.weightedCategories.map((cat) => {
+        if (cat.id === catId) {
+          return { ...cat, items: cat.items.filter((item) => item.id !== itemId) };
+        }
+        return cat;
+      })
+    }));
   };
 
   const handleAddPointAssignment = () => {
@@ -412,23 +452,24 @@ export default function GradeCheckerApp() {
       total: 10,
       completed: true,
     };
-    savePointsAssignments([...pointsAssignments, newAssign]);
+    updateActiveCourse(c => ({ ...c, pointsAssignments: [...c.pointsAssignments, newAssign] }));
   };
 
   const handleDeletePointAssignment = (id: string) => {
-    savePointsAssignments(pointsAssignments.filter((a) => a.id !== id));
+    updateActiveCourse(c => ({
+      ...c,
+      pointsAssignments: c.pointsAssignments.filter((a) => a.id !== id)
+    }));
   };
 
   const handleUpdatePointAssignment = (id: string, field: keyof PointAssignment, value: any) => {
-    const updated = pointsAssignments.map((a) => {
-      if (a.id === id) {
-        return { ...a, [field]: value };
-      }
-      return a;
-    });
-    savePointsAssignments(updated);
+    updateActiveCourse(c => ({
+      ...c,
+      pointsAssignments: c.pointsAssignments.map((a) => a.id === id ? { ...a, [field]: value } : a)
+    }));
   };
 
+  // --- GPA ACTIONS ---
   const handleAddGPACourse = () => {
     const newCourse: GPACourse = {
       id: Date.now().toString(),
@@ -437,11 +478,15 @@ export default function GradeCheckerApp() {
       grade: "A",
       level: "Regular",
     };
-    saveGpaCourses([...gpaCourses, newCourse]);
+    const updated = [...gpaCourses, newCourse];
+    setGpaCourses(updated);
+    localStorage.setItem("gc_gpaCourses", JSON.stringify(updated));
   };
 
   const handleDeleteGPACourse = (id: string) => {
-    saveGpaCourses(gpaCourses.filter((c) => c.id !== id));
+    const updated = gpaCourses.filter((c) => c.id !== id);
+    setGpaCourses(updated);
+    localStorage.setItem("gc_gpaCourses", JSON.stringify(updated));
   };
 
   const handleUpdateGPACourse = (id: string, field: keyof GPACourse, value: any) => {
@@ -451,7 +496,8 @@ export default function GradeCheckerApp() {
       }
       return c;
     });
-    saveGpaCourses(updated);
+    setGpaCourses(updated);
+    localStorage.setItem("gc_gpaCourses", JSON.stringify(updated));
   };
 
   const handleUpdateGPAScaleRule = (grade: string, field: "points" | "minPercent", value: number) => {
@@ -464,6 +510,7 @@ export default function GradeCheckerApp() {
     saveGpaRules(updated);
   };
 
+  // --- AI API IMPORT HANDLERS ---
   const handleParseSyllabus = async () => {
     if (!syllabusText.trim()) return;
     setIsParsing(true);
@@ -488,34 +535,36 @@ export default function GradeCheckerApp() {
 
       if (data.gradingSystem) {
         const mode = data.gradingSystem.toLowerCase().includes("point") ? "points" : "weighted";
-        saveGradingMode(mode);
+        
+        updateActiveCourse(c => {
+          const updated = { ...c, gradingMode: mode };
 
-        if (mode === "weighted" && Array.isArray(data.categories) && data.categories.length > 0) {
-          const formattedCategories: WeightedCategory[] = data.categories.map((cat: any, idx: number) => {
-            const isFinal = cat.name.toLowerCase().includes("final");
-            return {
-              id: String(idx + 1),
-              name: cat.name,
-              weight: cat.weight || 10,
-              currentScore: isFinal ? null : (cat.currentScore !== undefined ? cat.currentScore : 90),
-              isExpanded: false,
-              items: cat.items || [],
-            };
-          });
-          saveWeightedCategories(formattedCategories);
-        } else if (mode === "points" && Array.isArray(data.categories)) {
-          const formattedAssignments: PointAssignment[] = data.categories.map((cat: any, idx: number) => {
-            const isFinal = cat.name.toLowerCase().includes("final");
-            return {
-              id: String(idx + 1),
-              name: cat.name,
-              score: isFinal ? 0 : (cat.score !== undefined ? cat.score : Math.round((cat.totalPoints || 100) * 0.9)), 
-              total: cat.totalPoints || 100,
-              completed: !isFinal,
-            };
-          });
-          savePointsAssignments(formattedAssignments);
-        }
+          if (mode === "weighted" && Array.isArray(data.categories) && data.categories.length > 0) {
+            updated.weightedCategories = data.categories.map((cat: any, idx: number) => {
+              const isFinal = cat.name.toLowerCase().includes("final");
+              return {
+                id: String(idx + 1),
+                name: cat.name,
+                weight: cat.weight || 10,
+                currentScore: isFinal ? null : (cat.currentScore !== undefined ? cat.currentScore : 90),
+                isExpanded: false,
+                items: cat.items || [],
+              };
+            });
+          } else if (mode === "points" && Array.isArray(data.categories)) {
+            updated.pointsAssignments = data.categories.map((cat: any, idx: number) => {
+              const isFinal = cat.name.toLowerCase().includes("final");
+              return {
+                id: String(idx + 1),
+                name: cat.name,
+                score: isFinal ? 0 : (cat.score !== undefined ? cat.score : Math.round((cat.totalPoints || 100) * 0.9)), 
+                total: cat.totalPoints || 100,
+                completed: !isFinal,
+              };
+            });
+          }
+          return updated;
+        });
 
         if (Array.isArray(data.gradingScale) && data.gradingScale.length > 0) {
           const mergedRules = gpaRules.map((r) => {
@@ -560,52 +609,54 @@ export default function GradeCheckerApp() {
 
   const points: Array<{ xVal: number; yVal: number; svgX: number; svgY: number }> = [];
 
-  if (gradingMode === "weighted") {
-    let totalCompletedWeight = 0;
-    let earnedWeightContribution = 0;
-    let pendingWeight = 0;
+  if (activeCourse) {
+    if (activeCourse.gradingMode === "weighted") {
+      let totalCompletedWeight = 0;
+      let earnedWeightContribution = 0;
+      let pendingWeight = 0;
 
-    weightedCategories.forEach((cat) => {
-      let catScore = cat.currentScore;
-      if (cat.items && cat.items.length > 0) {
-        const sumEarned = cat.items.reduce((sum, item) => sum + item.score, 0);
-        const sumMax = cat.items.reduce((sum, item) => sum + item.maxScore, 0);
-        catScore = sumMax > 0 ? (sumEarned / sumMax) * 100 : 100;
+      activeCourse.weightedCategories.forEach((cat) => {
+        let catScore = cat.currentScore;
+        if (cat.items && cat.items.length > 0) {
+          const sumEarned = cat.items.reduce((sum, item) => sum + item.score, 0);
+          const sumMax = cat.items.reduce((sum, item) => sum + item.maxScore, 0);
+          catScore = sumMax > 0 ? (sumEarned / sumMax) * 100 : 100;
+        }
+
+        if (catScore !== null) {
+          earnedWeightContribution += (catScore * cat.weight) / 100;
+          totalCompletedWeight += cat.weight;
+        } else {
+          pendingWeight += cat.weight;
+        }
+      });
+
+      for (let x = 0; x <= 100; x += 5) {
+        const sumSyllabusWeight = totalCompletedWeight + pendingWeight;
+        const finalGrade = sumSyllabusWeight > 0 
+          ? ((earnedWeightContribution + (pendingWeight * (x / 100))) / sumSyllabusWeight) * 100 
+          : 100;
+        const cappedFinalGrade = Math.min(120, finalGrade);
+        const coords = getSvgCoords(x, cappedFinalGrade);
+        points.push({ xVal: x, yVal: cappedFinalGrade, svgX: coords.x, svgY: coords.y });
       }
+    } else {
+      const completedAssignments = activeCourse.pointsAssignments.filter((a) => a.completed);
+      const pendingAssignments = activeCourse.pointsAssignments.filter((a) => !a.completed);
 
-      if (catScore !== null) {
-        earnedWeightContribution += (catScore * cat.weight) / 100;
-        totalCompletedWeight += cat.weight;
-      } else {
-        pendingWeight += cat.weight;
+      const earnedPoints = completedAssignments.reduce((sum, a) => sum + a.score, 0);
+      const maxCompletedPoints = completedAssignments.reduce((sum, a) => sum + a.total, 0);
+      const pendingPoints = pendingAssignments.reduce((sum, a) => sum + a.total, 0);
+      const totalPossiblePoints = maxCompletedPoints + pendingPoints;
+
+      for (let x = 0; x <= 100; x += 5) {
+        const finalGrade = totalPossiblePoints > 0 
+          ? ((earnedPoints + (pendingPoints * (x / 100))) / totalPossiblePoints) * 100 
+          : 100;
+        const cappedFinalGrade = Math.min(120, finalGrade);
+        const coords = getSvgCoords(x, cappedFinalGrade);
+        points.push({ xVal: x, yVal: cappedFinalGrade, svgX: coords.x, svgY: coords.y });
       }
-    });
-
-    for (let x = 0; x <= 100; x += 5) {
-      const sumSyllabusWeight = totalCompletedWeight + pendingWeight;
-      const finalGrade = sumSyllabusWeight > 0 
-        ? ((earnedWeightContribution + (pendingWeight * (x / 100))) / sumSyllabusWeight) * 100 
-        : 100;
-      const cappedFinalGrade = Math.min(120, finalGrade);
-      const coords = getSvgCoords(x, cappedFinalGrade);
-      points.push({ xVal: x, yVal: cappedFinalGrade, svgX: coords.x, svgY: coords.y });
-    }
-  } else {
-    const completedAssignments = pointsAssignments.filter((a) => a.completed);
-    const pendingAssignments = pointsAssignments.filter((a) => !a.completed);
-
-    const earnedPoints = completedAssignments.reduce((sum, a) => sum + a.score, 0);
-    const maxCompletedPoints = completedAssignments.reduce((sum, a) => sum + a.total, 0);
-    const pendingPoints = pendingAssignments.reduce((sum, a) => sum + a.total, 0);
-    const totalPossiblePoints = maxCompletedPoints + pendingPoints;
-
-    for (let x = 0; x <= 100; x += 5) {
-      const finalGrade = totalPossiblePoints > 0 
-        ? ((earnedPoints + (pendingPoints * (x / 100))) / totalPossiblePoints) * 100 
-        : 100;
-      const cappedFinalGrade = Math.min(120, finalGrade);
-      const coords = getSvgCoords(x, cappedFinalGrade);
-      points.push({ xVal: x, yVal: cappedFinalGrade, svgX: coords.x, svgY: coords.y });
     }
   }
 
@@ -621,19 +672,18 @@ export default function GradeCheckerApp() {
 
   const targetRequiredScore = currentGradeResults.requiredScoreOnPending;
   const isTargetVisible = targetRequiredScore !== null && targetRequiredScore >= 0 && targetRequiredScore <= 120;
-  const targetCoords = isTargetVisible ? getSvgCoords(targetRequiredScore, desiredGrade) : null;
+  const targetCoords = isTargetVisible ? getSvgCoords(targetRequiredScore, activeCourse?.desiredGrade || 90) : null;
 
   const scaleGridLines = [110, 90, 70, 50];
 
   return (
-    /* FIXED CSS: Combined direct inline style background adjustments & fixed text utility classes so theme controls the root wrapper of this codeblock */
     <div className={`w-full min-h-screen font-sans transition-colors duration-200 p-4 sm:p-6 lg:p-8 ${
       darkMode ? "bg-zinc-950 text-zinc-100" : "bg-zinc-50 text-zinc-900"
     }`}>
       <div className="max-w-7xl mx-auto">
         
         {/* HEADER SECTION */}
-        <div className={`mb-12 flex flex-col md:flex-row md:items-center md:justify-between pb-8 border-b gap-6 ${
+        <div className={`mb-8 flex flex-col md:flex-row md:items-center md:justify-between pb-6 border-b gap-6 ${
           darkMode ? "border-zinc-850" : "border-zinc-200"
         }`}>
           <div>
@@ -689,7 +739,7 @@ export default function GradeCheckerApp() {
         </div>
 
         <AnimatePresence mode="wait">
-          {/* TAB 1: CLASS GRADE CHECKER */}
+          {/* TAB 1: CLASS GRADE CALCULATOR WITH DASHBOARD */}
           {activeTab === "class" && (
             <motion.div
               key="class-tab"
@@ -699,473 +749,611 @@ export default function GradeCheckerApp() {
               transition={{ duration: 0.15 }}
               className="grid grid-cols-1 lg:grid-cols-12 gap-8"
             >
-              {/* Input Column */}
-              <div className="lg:col-span-7 space-y-8">
-                {/* Class Configuration Card */}
-                <div className={`p-6 rounded-xl border space-y-6 ${
+              
+              {/* SIDEBAR COURSE DASHBOARD SWITCHER */}
+              <div className="lg:col-span-3 space-y-4">
+                <div className={`p-4 rounded-xl border ${
                   darkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
                 }`}>
-                  <div className={`flex flex-col sm:flex-row justify-between sm:items-center gap-4 border-b pb-5 ${
-                    darkMode ? "border-zinc-800" : "border-zinc-100"
-                  }`}>
-                    <input
-                      type="text"
-                      value={classTitle}
-                      onChange={(e) => saveClassTitle(e.target.value)}
-                      className={`text-xl font-semibold bg-transparent border-b hover:border-zinc-400 dark:hover:border-zinc-600 focus:border-indigo-500 focus:outline-none py-1 w-full max-w-sm transition-colors ${
-                        darkMode ? "text-white border-zinc-700" : "text-zinc-900 border-zinc-300"
-                      }`}
-                      placeholder="Enter Course Title..."
-                    />
-                    <div className="flex gap-2 shrink-0">
-                      <button
-                        onClick={() => setShowImportDialog(true)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium border rounded-md transition-colors cursor-pointer ${
-                          darkMode 
-                            ? "text-indigo-400 bg-indigo-950/40 border-indigo-900/50 hover:bg-indigo-950" 
-                            : "text-indigo-700 bg-indigo-50 border-indigo-200 hover:bg-indigo-100"
-                        }`}
-                      >
-                        <Sparkles size={14} />
-                        <span>Smart Import</span>
-                      </button>
-                      <button
-                        onClick={resetClassData}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium border rounded-md transition-colors cursor-pointer ${
-                          darkMode 
-                            ? "text-zinc-400 bg-zinc-800 border-zinc-700 hover:bg-zinc-700" 
-                            : "text-zinc-600 bg-white border-zinc-300 hover:bg-zinc-50"
-                        }`}
-                        title="Clear all class data"
-                      >
-                        <RotateCcw size={14} />
-                        <span>Reset</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
-                    <div>
-                      <label className={`block text-xs font-semibold uppercase tracking-wider mb-3 ${
-                        darkMode ? "text-zinc-400" : "text-zinc-500"
-                      }`}>
-                        Grading Structure
-                      </label>
-                      <div className={`flex p-1 rounded-lg border ${
-                        darkMode ? "bg-zinc-950 border-zinc-800" : "bg-zinc-100 border-zinc-200"
-                      }`}>
-                        <button
-                          onClick={() => saveGradingMode("weighted")}
-                          className={`flex-1 py-1.5 px-3 text-sm font-medium rounded-md transition-colors cursor-pointer ${
-                            gradingMode === "weighted"
-                              ? (darkMode ? "bg-zinc-800 text-white border border-zinc-700" : "bg-white text-zinc-900 border border-zinc-200")
-                              : (darkMode ? "text-zinc-500 hover:text-zinc-300" : "text-zinc-500 hover:text-zinc-700")
-                          }`}
-                        >
-                          Weighted
-                        </button>
-                        <button
-                          onClick={() => saveGradingMode("points")}
-                          className={`flex-1 py-1.5 px-3 text-sm font-medium rounded-md transition-colors cursor-pointer ${
-                            gradingMode === "points"
-                              ? (darkMode ? "bg-zinc-800 text-white border border-zinc-700" : "bg-white text-zinc-900 border border-zinc-200")
-                              : (darkMode ? "text-zinc-500 hover:text-zinc-300" : "text-zinc-500 hover:text-zinc-700")
-                          }`}
-                        >
-                          Total Points
-                        </button>
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="flex justify-between items-center mb-3">
-                        <label className={`block text-xs font-semibold uppercase tracking-wider ${
-                          darkMode ? "text-zinc-400" : "text-zinc-500"
-                        }`}>
-                          Desired Target Grade
-                        </label>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <input
-                          type="range"
-                          min="50"
-                          max="120"
-                          step="0.5"
-                          value={desiredGrade}
-                          onChange={(e) => saveDesiredGrade(Number(e.target.value))}
-                          className="w-full h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-indigo-600"
-                        />
-                        <div className="flex items-center">
-                          <input
-                            type="number"
-                            min="0"
-                            max="120"
-                            value={desiredGrade}
-                            onChange={(e) => saveDesiredGrade(Math.min(120, Math.max(0, Number(e.target.value))))}
-                            className={`w-16 text-center text-sm font-semibold bg-transparent border rounded-md py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 shadow-none ${
-                              darkMode ? "text-white border-zinc-700" : "text-zinc-900 border-zinc-300"
-                            }`}
-                          />
-                          <span className={`ml-1 font-medium ${darkMode ? "text-zinc-400" : "text-zinc-500"}`}>%</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Dynamic Grading List */}
-                <div className={`rounded-xl border overflow-hidden ${
-                  darkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
-                }`}>
-                  <div className={`px-6 py-4 border-b flex justify-between items-center ${
-                    darkMode ? "border-zinc-800 bg-zinc-900/60" : "bg-zinc-50"
-                  }`}>
-                    <h3 className={`font-semibold ${darkMode ? "text-zinc-200" : "text-zinc-800"}`}>
-                      {gradingMode === "weighted" ? "Categories & Weights" : "Assignment List"}
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className={`text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 ${
+                      darkMode ? "text-zinc-400" : "text-zinc-500"
+                    }`}>
+                      <FolderOpen size={14} /> Course Dashboard
                     </h3>
                     <button
-                      onClick={gradingMode === "weighted" ? handleAddCategory : handleAddPointAssignment}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white rounded-md transition-colors cursor-pointer ${
-                        darkMode ? "bg-indigo-700 hover:bg-indigo-650" : "bg-indigo-600 hover:bg-indigo-700"
-                      }`}
+                      onClick={handleAddNewCourse}
+                      className={`p-1.5 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-indigo-500 transition-colors cursor-pointer`}
+                      title="Add new course to dashboard"
                     >
                       <Plus size={16} />
-                      <span>
-                        {gradingMode === "weighted" ? "Add Grading Category" : "Add New Assignment"}
-                      </span>
                     </button>
                   </div>
 
-                  <div className={`divide-y ${darkMode ? "divide-zinc-800/80" : "divide-zinc-150"}`}>
-                    {/* WEIGHTED MODE */}
-                    {gradingMode === "weighted" && (
-                      <>
-                        {weightedCategories.length === 0 ? (
-                          <div className="p-12 text-center text-zinc-500">
-                            <p className={`font-medium ${darkMode ? "text-zinc-350" : "text-zinc-600"}`}>No grading categories defined.</p>
-                            <p className="text-sm mt-1">Click "Add Grading Category" or use AI to import your syllabus & grades.</p>
+                  {/* Course list stack */}
+                  <div className="space-y-2">
+                    {courses.map((course) => {
+                      const isActive = course.id === activeCourseId;
+                      const cGrade = course.gradingMode === "weighted" ? calculateWeightedGrade(course) : calculatePointsGrade(course);
+                      return (
+                        <div
+                          key={course.id}
+                          onClick={() => setActiveCourseId(course.id)}
+                          className={`group w-full flex items-center justify-between p-3 rounded-lg border transition-all cursor-pointer text-left ${
+                            isActive
+                              ? (darkMode ? "bg-zinc-800 border-zinc-700 text-white" : "bg-zinc-100 border-zinc-300 text-zinc-900")
+                              : (darkMode ? "bg-zinc-950/40 border-zinc-900 hover:bg-zinc-900 text-zinc-400" : "bg-zinc-50 border-zinc-150 hover:bg-zinc-100/60 text-zinc-650")
+                          }`}
+                        >
+                          <div className="flex-1 min-w-0 pr-2">
+                            <h4 className="text-sm font-semibold truncate leading-tight group-hover:text-indigo-500 dark:group-hover:text-indigo-400 transition-colors">
+                              {course.title || "Untitled Course"}
+                            </h4>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className={`text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                                darkMode ? "bg-zinc-900 text-zinc-455" : "bg-white text-zinc-500 border border-zinc-200"
+                              }`}>
+                                {course.courseLevel}
+                              </span>
+                              <span className={`text-xs font-medium ${darkMode ? "text-zinc-500" : "text-zinc-500"}`}>
+                                {cGrade.currentOverallGrade}%
+                              </span>
+                            </div>
                           </div>
-                        ) : (
-                          weightedCategories.map((cat) => (
-                            <div key={cat.id} className={`p-4 sm:p-6 transition-colors ${
-                              darkMode ? "hover:bg-zinc-850/20" : "hover:bg-zinc-50/50"
-                            }`}>
-                              <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-                                <div className="flex items-center gap-3 flex-1">
-                                  <button
-                                    onClick={() => handleUpdateCategory(cat.id, "isExpanded", !cat.isExpanded)}
-                                    className={`p-1.5 border rounded-md transition-colors cursor-pointer ${
-                                      darkMode 
-                                        ? "text-zinc-400 border-zinc-850 bg-zinc-900 hover:bg-zinc-800" 
-                                        : "text-zinc-400 border-zinc-200 bg-white hover:bg-zinc-50"
-                                    }`}
-                                  >
-                                    {cat.isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                                  </button>
-                                  <input
-                                    type="text"
-                                    value={cat.name}
-                                    onChange={(e) => handleUpdateCategory(cat.id, "name", e.target.value)}
-                                    className={`font-medium bg-transparent border-b hover:border-zinc-450 focus:border-indigo-500 focus:outline-none py-1 w-full max-w-[220px] ${
-                                      darkMode ? "text-white border-zinc-700 hover:border-zinc-600" : "text-zinc-900 border-zinc-300"
-                                    }`}
-                                    placeholder="Category Name"
-                                  />
-                                </div>
+                          <button
+                            onClick={(e) => handleDeleteCourse(course.id, e)}
+                            className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 dark:hover:bg-red-950/20 text-zinc-400 hover:text-red-500 transition-all shrink-0"
+                            title="Delete course"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
 
-                                <div className="flex items-center gap-5">
-                                  <div className="flex items-center gap-2">
-                                    <span className={`text-sm font-medium ${darkMode ? "text-zinc-400" : "text-zinc-550"}`}>Weight:</span>
-                                    <div className="relative">
-                                      <input
-                                        type="number"
-                                        value={cat.weight}
-                                        onChange={(e) => handleUpdateCategory(cat.id, "weight", Math.max(0, Number(e.target.value)))}
-                                        className={`w-16 text-center text-sm font-medium bg-transparent border rounded-md py-1 pr-4 focus:outline-none focus:ring-1 focus:ring-indigo-500 ${
-                                          darkMode ? "text-white border-zinc-700" : "text-zinc-900 border-zinc-300"
+                  <button
+                    onClick={syncDashboardToGpa}
+                    className={`mt-4 w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-md border transition-all cursor-pointer ${
+                      darkMode
+                        ? "bg-indigo-950/40 border-indigo-900/60 text-indigo-300 hover:bg-indigo-950"
+                        : "bg-indigo-50 border-indigo-150 text-indigo-700 hover:bg-indigo-100"
+                    }`}
+                  >
+                    <GraduationCap size={14} />
+                    <span>Sync Classes to GPA Planner</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* MAIN CONTENT AREA */}
+              {activeCourse ? (
+                <>
+                  {/* Inputs Column */}
+                  <div className="lg:col-span-5 space-y-8">
+                    {/* Active Class Setup */}
+                    <div className={`p-6 rounded-xl border space-y-6 ${
+                      darkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
+                    }`}>
+                      <div className={`flex flex-col sm:flex-row justify-between sm:items-center gap-4 border-b pb-5 ${
+                        darkMode ? "border-zinc-800" : "border-zinc-100"
+                      }`}>
+                        <input
+                          type="text"
+                          value={activeCourse.title}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            updateActiveCourse(c => ({ ...c, title: val }));
+                          }}
+                          className={`text-xl font-semibold bg-transparent border-b hover:border-zinc-400 dark:hover:border-zinc-650 focus:border-indigo-500 focus:outline-none py-1 w-full max-w-sm transition-colors ${
+                            darkMode ? "text-white border-zinc-700" : "text-zinc-900 border-zinc-300"
+                          }`}
+                          placeholder="Enter Course Title..."
+                        />
+                        <div className="flex gap-2 shrink-0">
+                          <button
+                            onClick={() => setShowImportDialog(true)}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium border rounded-md transition-colors cursor-pointer ${
+                              darkMode 
+                                ? "text-indigo-400 bg-indigo-950/40 border-indigo-900/50 hover:bg-indigo-950" 
+                                : "text-indigo-700 bg-indigo-50 border-indigo-200 hover:bg-indigo-100"
+                            }`}
+                          >
+                            <Sparkles size={14} />
+                            <span>Smart Import</span>
+                          </button>
+                          <button
+                            onClick={resetClassData}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium border rounded-md transition-colors cursor-pointer ${
+                              darkMode 
+                                ? "text-zinc-400 bg-zinc-800 border-zinc-700 hover:bg-zinc-700" 
+                                : "text-zinc-600 bg-white border-zinc-300 hover:bg-zinc-50"
+                            }`}
+                            title="Reset all assignments"
+                          >
+                            <RotateCcw size={14} />
+                            <span>Reset</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                        <div>
+                          <label className={`block text-xs font-semibold uppercase tracking-wider mb-3 ${
+                            darkMode ? "text-zinc-400" : "text-zinc-500"
+                          }`}>
+                            Grading Structure
+                          </label>
+                          <div className={`flex p-1 rounded-lg border ${
+                            darkMode ? "bg-zinc-950 border-zinc-800" : "bg-zinc-100 border-zinc-200"
+                          }`}>
+                            <button
+                              onClick={() => updateActiveCourse(c => ({ ...c, gradingMode: "weighted" }))}
+                              className={`flex-1 py-1.5 px-3 text-sm font-medium rounded-md transition-colors cursor-pointer ${
+                                activeCourse.gradingMode === "weighted"
+                                  ? (darkMode ? "bg-zinc-800 text-white border border-zinc-700" : "bg-white text-zinc-900 border border-zinc-200")
+                                  : (darkMode ? "text-zinc-500 hover:text-zinc-300" : "text-zinc-500 hover:text-zinc-700")
+                              }`}
+                            >
+                              Weighted
+                            </button>
+                            <button
+                              onClick={() => updateActiveCourse(c => ({ ...c, gradingMode: "points" }))}
+                              className={`flex-1 py-1.5 px-3 text-sm font-medium rounded-md transition-colors cursor-pointer ${
+                                activeCourse.gradingMode === "points"
+                                  ? (darkMode ? "bg-zinc-800 text-white border border-zinc-700" : "bg-white text-zinc-900 border border-zinc-200")
+                                  : (darkMode ? "text-zinc-500 hover:text-zinc-300" : "text-zinc-500 hover:text-zinc-700")
+                              }`}
+                            >
+                              Total Points
+                            </button>
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="flex justify-between items-center mb-3">
+                            <label className={`block text-xs font-semibold uppercase tracking-wider ${
+                              darkMode ? "text-zinc-400" : "text-zinc-500"
+                            }`}>
+                              Desired Target Grade
+                            </label>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <input
+                              type="range"
+                              min="50"
+                              max="120"
+                              step="0.5"
+                              value={activeCourse.desiredGrade}
+                              onChange={(e) => {
+                                const val = Number(e.target.value);
+                                updateActiveCourse(c => ({ ...c, desiredGrade: val }));
+                              }}
+                              className="w-full h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                            />
+                            <div className="flex items-center">
+                              <input
+                                type="number"
+                                min="0"
+                                max="120"
+                                value={activeCourse.desiredGrade}
+                                onChange={(e) => {
+                                  const val = Math.min(120, Math.max(0, Number(e.target.value)));
+                                  updateActiveCourse(c => ({ ...c, desiredGrade: val }));
+                                }}
+                                className={`w-16 text-center text-sm font-semibold bg-transparent border rounded-md py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 shadow-none ${
+                                  darkMode ? "text-white border-zinc-700" : "text-zinc-900 border-zinc-300"
+                                }`}
+                              />
+                              <span className={`ml-1 font-medium ${darkMode ? "text-zinc-400" : "text-zinc-505"}`}>%</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Level and Credit Info (GPA Synergy) */}
+                      <div className={`grid grid-cols-2 gap-6 pt-4 border-t ${
+                        darkMode ? "border-zinc-800" : "border-zinc-100"
+                      }`}>
+                        <div>
+                          <label className={`block text-xs font-semibold uppercase tracking-wider mb-2 ${
+                            darkMode ? "text-zinc-405" : "text-zinc-500"
+                          }`}>
+                            Course weight Level
+                          </label>
+                          <select
+                            value={activeCourse.courseLevel}
+                            onChange={(e) => {
+                              const val = e.target.value as any;
+                              updateActiveCourse(c => ({ ...c, courseLevel: val }));
+                            }}
+                            className={`w-full text-xs font-semibold border rounded-md p-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer ${
+                              darkMode ? "bg-zinc-800 border-zinc-700 text-white" : "bg-white border-zinc-300 text-zinc-900"
+                            }`}
+                          >
+                            <option value="Regular">Regular</option>
+                            <option value="Honors">Honors (+0.5 GPA)</option>
+                            <option value="AP">AP (+1.0 GPA)</option>
+                            <option value="IB">IB (+1.0 GPA)</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className={`block text-xs font-semibold uppercase tracking-wider mb-2 ${
+                            darkMode ? "text-zinc-400" : "text-zinc-500"
+                          }`}>
+                            Credits / Hours
+                          </label>
+                          <input
+                            type="number"
+                            min="0.5"
+                            max="10"
+                            step="0.5"
+                            value={activeCourse.credits}
+                            onChange={(e) => {
+                              const val = Math.max(0.5, Number(e.target.value));
+                              updateActiveCourse(c => ({ ...c, credits: val }));
+                            }}
+                            className={`w-full text-xs font-semibold bg-transparent border rounded-md p-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 ${
+                              darkMode ? "border-zinc-700 text-white" : "border-zinc-300 text-zinc-900"
+                            }`}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Dynamic Grading List */}
+                    <div className={`rounded-xl border overflow-hidden ${
+                      darkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
+                    }`}>
+                      <div className={`px-6 py-4 border-b flex justify-between items-center ${
+                        darkMode ? "border-zinc-800 bg-zinc-900/60" : "bg-zinc-50"
+                      }`}>
+                        <h3 className={`font-semibold ${darkMode ? "text-zinc-200" : "text-zinc-800"}`}>
+                          {activeCourse.gradingMode === "weighted" ? "Categories & Weights" : "Assignment List"}
+                        </h3>
+                        <button
+                          onClick={activeCourse.gradingMode === "weighted" ? handleAddCategory : handleAddPointAssignment}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white rounded-md transition-colors cursor-pointer ${
+                            darkMode ? "bg-indigo-700 hover:bg-indigo-650" : "bg-indigo-600 hover:bg-indigo-700"
+                          }`}
+                        >
+                          <Plus size={16} />
+                          <span>
+                            {activeCourse.gradingMode === "weighted" ? "Add Grading Category" : "Add New Assignment"}
+                          </span>
+                        </button>
+                      </div>
+
+                      <div className={`divide-y ${darkMode ? "divide-zinc-800/80" : "divide-zinc-150"}`}>
+                        {/* WEIGHTED MODE */}
+                        {activeCourse.gradingMode === "weighted" && (
+                          <>
+                            {activeCourse.weightedCategories.length === 0 ? (
+                              <div className="p-12 text-center text-zinc-500">
+                                <p className={`font-medium ${darkMode ? "text-zinc-350" : "text-zinc-600"}`}>No grading categories defined.</p>
+                                <p className="text-sm mt-1">Click "Add Grading Category" or use AI to import your syllabus & grades.</p>
+                              </div>
+                            ) : (
+                              activeCourse.weightedCategories.map((cat) => (
+                                <div key={cat.id} className={`p-4 sm:p-6 transition-colors ${
+                                  darkMode ? "hover:bg-zinc-850/20" : "hover:bg-zinc-50/50"
+                                }`}>
+                                  <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+                                    <div className="flex items-center gap-3 flex-1">
+                                      <button
+                                        onClick={() => handleUpdateCategory(cat.id, "isExpanded", !cat.isExpanded)}
+                                        className={`p-1.5 border rounded-md transition-colors cursor-pointer ${
+                                          darkMode 
+                                            ? "text-zinc-400 border-zinc-850 bg-zinc-900 hover:bg-zinc-800" 
+                                            : "text-zinc-405 border-zinc-200 bg-white hover:bg-zinc-50"
                                         }`}
+                                      >
+                                        {cat.isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                                      </button>
+                                      <input
+                                        type="text"
+                                        value={cat.name}
+                                        onChange={(e) => handleUpdateCategory(cat.id, "name", e.target.value)}
+                                        className={`font-medium bg-transparent border-b hover:border-zinc-450 focus:border-indigo-500 focus:outline-none py-1 w-full max-w-[220px] ${
+                                          darkMode ? "text-white border-zinc-700 hover:border-zinc-600" : "text-zinc-900 border-zinc-300"
+                                        }`}
+                                        placeholder="Category Name"
                                       />
-                                      <span className="absolute right-2 top-1.5 text-xs text-zinc-400 dark:text-zinc-500 font-medium">%</span>
+                                    </div>
+
+                                    <div className="flex items-center gap-5">
+                                      <div className="flex items-center gap-2">
+                                        <span className={`text-sm font-medium ${darkMode ? "text-zinc-400" : "text-zinc-550"}`}>Weight:</span>
+                                        <div className="relative">
+                                          <input
+                                            type="number"
+                                            value={cat.weight}
+                                            onChange={(e) => handleUpdateCategory(cat.id, "weight", Math.max(0, Number(e.target.value)))}
+                                            className={`w-16 text-center text-sm font-medium bg-transparent border rounded-md py-1 pr-4 focus:outline-none focus:ring-1 focus:ring-indigo-500 ${
+                                              darkMode ? "text-white border-zinc-700" : "text-zinc-900 border-zinc-300"
+                                            }`}
+                                          />
+                                          <span className="absolute right-2 top-1.5 text-xs text-zinc-400 dark:text-zinc-500 font-medium">%</span>
+                                        </div>
+                                      </div>
+
+                                      <div className="flex items-center gap-2">
+                                        <span className={`text-sm font-medium ${darkMode ? "text-zinc-400" : "text-zinc-550"}`}>Avg (Max=120%):</span>
+                                        {cat.items && cat.items.length > 0 ? (
+                                          <div className={`font-medium text-sm py-1 px-3 rounded-md border ${
+                                            darkMode ? "bg-zinc-950 text-zinc-300 border-zinc-800" : "bg-zinc-100 text-zinc-750 border-zinc-200"
+                                          }`}>
+                                            {(
+                                              Math.round(
+                                                (cat.items.reduce((sum, i) => sum + i.score, 0) /
+                                                  cat.items.reduce((sum, i) => sum + i.maxScore, 0)) *
+                                                  10000
+                                              ) / 100
+                                            ).toFixed(1)}
+                                            %
+                                          </div>
+                                        ) : (
+                                          <div className="flex items-center gap-1">
+                                            <input
+                                              type="number"
+                                              value={cat.currentScore === null ? "" : cat.currentScore}
+                                              onChange={(e) => {
+                                                const val = e.target.value;
+                                                handleUpdateCategory(cat.id, "currentScore", val === "" ? null : Math.min(120, Number(val)));
+                                              }}
+                                              className={`w-16 text-center text-sm font-medium bg-transparent border rounded-md py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 ${
+                                                darkMode ? "text-white border-zinc-700" : "text-zinc-900 border-zinc-300"
+                                              }`}
+                                              placeholder="TBD"
+                                            />
+                                            {cat.currentScore !== null && <span className="text-sm text-zinc-400">%</span>}
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      <button
+                                        onClick={() => handleDeleteCategory(cat.id)}
+                                        className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                                          darkMode ? "text-zinc-400 hover:text-red-400 hover:bg-red-950/20" : "text-zinc-400 hover:text-red-650 hover:bg-red-50"
+                                        }`}
+                                        title="Delete Category"
+                                      >
+                                        <Trash2 size={18} />
+                                      </button>
                                     </div>
                                   </div>
 
-                                  <div className="flex items-center gap-2">
-                                    <span className={`text-sm font-medium ${darkMode ? "text-zinc-400" : "text-zinc-550"}`}>Avg (Max=120%):</span>
-                                    {cat.items && cat.items.length > 0 ? (
-                                      <div className={`font-medium text-sm py-1 px-3 rounded-md border ${
-                                        darkMode ? "bg-zinc-950 text-zinc-300 border-zinc-800" : "bg-zinc-100 text-zinc-750 border-zinc-200"
-                                      }`}>
-                                        {(
-                                          Math.round(
-                                            (cat.items.reduce((sum, i) => sum + i.score, 0) /
-                                              cat.items.reduce((sum, i) => sum + i.maxScore, 0)) *
-                                              10000
-                                          ) / 100
-                                        ).toFixed(1)}
-                                        %
-                                      </div>
-                                    ) : (
-                                      <div className="flex items-center gap-1">
-                                        <input
-                                          type="number"
-                                          value={cat.currentScore === null ? "" : cat.currentScore}
-                                          onChange={(e) => {
-                                            const val = e.target.value;
-                                            handleUpdateCategory(cat.id, "currentScore", val === "" ? null : Math.min(120, Number(val)));
-                                          }}
-                                          className={`w-16 text-center text-sm font-medium bg-transparent border rounded-md py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 ${
-                                            darkMode ? "text-white border-zinc-700" : "text-zinc-900 border-zinc-300"
+                                  {/* Nested Items details */}
+                                  {cat.isExpanded && (
+                                    <div className={`mt-4 ml-8 pl-4 border-l-2 space-y-3 p-4 rounded-lg ${
+                                      darkMode ? "border-zinc-800 bg-zinc-950/40" : "border-zinc-200 bg-zinc-50/50"
+                                    }`}>
+                                      <div className="flex justify-between items-center mb-2">
+                                        <span className={`text-xs font-semibold uppercase tracking-wide ${
+                                          darkMode ? "text-zinc-400" : "text-zinc-505"
+                                        }`}>Individual Assignments</span>
+                                        <button
+                                          onClick={() => handleAddNestedItem(cat.id)}
+                                          className={`flex items-center gap-1.5 text-xs font-medium border px-2 py-1 rounded transition-colors cursor-pointer ${
+                                            darkMode ? "text-zinc-300 bg-zinc-900 border-zinc-800 hover:bg-zinc-800" : "text-zinc-700 bg-white border-zinc-300 hover:bg-zinc-100"
                                           }`}
-                                          placeholder="TBD"
-                                        />
-                                        {cat.currentScore !== null && <span className="text-sm text-zinc-405">%</span>}
+                                        >
+                                          <PlusCircle size={12} />
+                                          <span>Add Item</span>
+                                        </button>
                                       </div>
-                                    )}
-                                  </div>
-
-                                  <button
-                                    onClick={() => handleDeleteCategory(cat.id)}
-                                    className={`p-1.5 rounded-md transition-colors cursor-pointer ${
-                                      darkMode ? "text-zinc-400 hover:text-red-400 hover:bg-red-950/20" : "text-zinc-400 hover:text-red-650 hover:bg-red-50"
-                                    }`}
-                                    title="Delete Category"
-                                  >
-                                    <Trash2 size={18} />
-                                  </button>
-                                </div>
-                              </div>
-
-                              {/* Nested Items details */}
-                              {cat.isExpanded && (
-                                <div className={`mt-4 ml-8 pl-4 border-l-2 space-y-3 p-4 rounded-lg ${
-                                  darkMode ? "border-zinc-800 bg-zinc-950/40" : "border-zinc-200 bg-zinc-50/50"
-                                }`}>
-                                  <div className="flex justify-between items-center mb-2">
-                                    <span className={`text-xs font-semibold uppercase tracking-wide ${
-                                      darkMode ? "text-zinc-400" : "text-zinc-500"
-                                    }`}>Individual Assignments</span>
-                                    <button
-                                      onClick={() => handleAddNestedItem(cat.id)}
-                                      className={`flex items-center gap-1.5 text-xs font-medium border px-2 py-1 rounded transition-colors cursor-pointer ${
-                                        darkMode ? "text-zinc-300 bg-zinc-900 border-zinc-800 hover:bg-zinc-800" : "text-zinc-700 bg-white border-zinc-300 hover:bg-zinc-100"
-                                      }`}
-                                    >
-                                      <PlusCircle size={12} />
-                                      <span>Add Item</span>
-                                    </button>
-                                  </div>
-                                  {cat.items.length === 0 ? (
-                                    <p className="text-sm text-zinc-400 dark:text-zinc-500 italic">No specific assignments logged. Average is manually set above.</p>
-                                  ) : (
-                                    <div className="space-y-2">
-                                      {cat.items.map((item) => (
-                                        <div key={item.id} className="flex flex-wrap sm:flex-nowrap items-center gap-3">
-                                          <input
-                                            type="text"
-                                            value={item.name}
-                                            onChange={(e) => handleUpdateNestedItem(cat.id, item.id, "name", e.target.value)}
-                                            className={`text-sm border-b bg-transparent focus:border-indigo-500 focus:outline-none py-1 w-full sm:w-auto flex-1 ${
-                                              darkMode ? "text-zinc-300 border-zinc-700 hover:border-zinc-650" : "text-zinc-700 border-zinc-300 hover:border-zinc-400"
-                                            }`}
-                                            placeholder="Item Name"
-                                          />
-                                          <div className="flex items-center gap-2">
-                                            <input
-                                              type="number"
-                                              value={item.score}
-                                              onChange={(e) => handleUpdateNestedItem(cat.id, item.id, "score", Math.max(0, Number(e.target.value)))}
-                                              className={`w-16 text-center text-sm font-medium bg-transparent border rounded py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 ${
-                                                darkMode ? "text-white border-zinc-700" : "text-zinc-900 border-zinc-300"
-                                              }`}
-                                            />
-                                            <span className="text-sm font-medium text-zinc-400 dark:text-zinc-505">/</span>
-                                            <input
-                                              type="number"
-                                              value={item.maxScore}
-                                              onChange={(e) => handleUpdateNestedItem(cat.id, item.id, "maxScore", Math.max(1, Number(e.target.value)))}
-                                              className={`w-16 text-center text-sm font-medium bg-transparent border rounded py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 ${
-                                                darkMode ? "text-white border-zinc-700" : "text-zinc-900 border-zinc-300"
-                                              }`}
-                                            />
-                                          </div>
-                                          <button
-                                            onClick={() => handleDeleteNestedItem(cat.id, item.id)}
-                                            className="text-zinc-400 hover:text-red-500 p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
-                                            title="Remove Item"
-                                          >
-                                            <X size={16} />
-                                          </button>
+                                      {cat.items.length === 0 ? (
+                                        <p className="text-sm text-zinc-400 dark:text-zinc-500 italic">No specific assignments logged. Average is manually set above.</p>
+                                      ) : (
+                                        <div className="space-y-2">
+                                          {cat.items.map((item) => (
+                                            <div key={item.id} className="flex flex-wrap sm:flex-nowrap items-center gap-3">
+                                              <input
+                                                type="text"
+                                                value={item.name}
+                                                onChange={(e) => handleUpdateNestedItem(cat.id, item.id, "name", e.target.value)}
+                                                className={`text-sm border-b bg-transparent focus:border-indigo-500 focus:outline-none py-1 w-full sm:w-auto flex-1 ${
+                                                  darkMode ? "text-zinc-300 border-zinc-700 hover:border-zinc-650" : "text-zinc-700 border-zinc-300 hover:border-zinc-400"
+                                                }`}
+                                                placeholder="Item Name"
+                                              />
+                                              <div className="flex items-center gap-2">
+                                                <input
+                                                  type="number"
+                                                  value={item.score}
+                                                  onChange={(e) => handleUpdateNestedItem(cat.id, item.id, "score", Math.max(0, Number(e.target.value)))}
+                                                  className={`w-16 text-center text-sm font-medium bg-transparent border rounded py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 ${
+                                                    darkMode ? "text-white border-zinc-700" : "text-zinc-900 border-zinc-300"
+                                                  }`}
+                                                />
+                                                <span className="text-sm font-medium text-zinc-405">/</span>
+                                                <input
+                                                  type="number"
+                                                  value={item.maxScore}
+                                                  onChange={(e) => handleUpdateNestedItem(cat.id, item.id, "maxScore", Math.max(1, Number(e.target.value)))}
+                                                  className={`w-16 text-center text-sm font-medium bg-transparent border rounded py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 ${
+                                                    darkMode ? "text-white border-zinc-700" : "text-zinc-900 border-zinc-300"
+                                                  }`}
+                                                />
+                                              </div>
+                                              <button
+                                                onClick={() => handleDeleteNestedItem(cat.id, item.id)}
+                                                className="text-zinc-400 hover:text-red-500 p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
+                                                title="Remove Item"
+                                              >
+                                                <X size={16} />
+                                              </button>
+                                            </div>
+                                          ))}
                                         </div>
-                                      ))}
+                                      )}
                                     </div>
                                   )}
                                 </div>
-                              )}
-                            </div>
-                          ))
+                              ))
+                            )}
+                            
+                            {activeCourse.weightedCategories.length > 0 && (
+                              <div className={`px-6 py-4 text-sm border-t flex items-center justify-between ${
+                                darkMode ? "bg-zinc-950 border-zinc-805" : "bg-zinc-50 border-zinc-200"
+                              }`}>
+                                <span className={darkMode ? "text-zinc-400" : "text-zinc-600"}>Total Assigned Weight:</span>
+                                <span className={`font-semibold ${
+                                  activeCourse.weightedCategories.reduce((sum, cat) => sum + cat.weight, 0) === 100
+                                    ? "text-green-700 dark:text-green-400"
+                                    : "text-amber-600 dark:text-amber-450"
+                                }`}>
+                                  {activeCourse.weightedCategories.reduce((sum, cat) => sum + cat.weight, 0)}% / 100%
+                                </span>
+                              </div>
+                            )}
+                          </>
                         )}
-                        
-                        {weightedCategories.length > 0 && (
-                          <div className={`px-6 py-4 text-sm border-t flex items-center justify-between ${
-                            darkMode ? "bg-zinc-950 border-zinc-805" : "bg-zinc-50 border-zinc-200"
-                          }`}>
-                            <span className={darkMode ? "text-zinc-400" : "text-zinc-600"}>Total Assigned Weight:</span>
-                            <span className={`font-semibold ${
-                              weightedCategories.reduce((sum, cat) => sum + cat.weight, 0) === 100
-                                ? "text-green-700 dark:text-green-400"
-                                : "text-amber-600 dark:text-amber-450"
-                            }`}>
-                              {weightedCategories.reduce((sum, cat) => sum + cat.weight, 0)}% / 100%
-                            </span>
-                          </div>
-                        )}
-                      </>
-                    )}
 
-                    {/* POINTS MODE */}
-                    {gradingMode === "points" && (
-                      <div className="p-4 sm:p-6">
-                        {pointsAssignments.length === 0 ? (
-                          <div className="p-12 text-center text-zinc-500">
-                            <p className={`font-medium ${darkMode ? "text-zinc-350" : "text-zinc-650"}`}>No assignments added yet.</p>
-                            <p className="text-sm mt-1">Add assignments manually or use AI syllabus import.</p>
-                          </div>
-                        ) : (
-                          <div className="space-y-4">
-                            <div className={`grid grid-cols-12 gap-3 pb-3 text-xs font-semibold uppercase tracking-wide border-b ${
-                              darkMode ? "text-zinc-450 border-zinc-800" : "text-zinc-500 border-zinc-200"
-                            }`}>
-                              <div className="col-span-5">Assignment Title</div>
-                              <div className="col-span-3 text-center">Score / Max</div>
-                              <div className="col-span-2 text-center">Graded?</div>
-                              <div className="col-span-2 text-center">Remove</div>
-                            </div>
-                            {pointsAssignments.map((a) => (
-                              <div key={a.id} className="grid grid-cols-12 gap-3 items-center py-1">
-                                <div className="col-span-5">
-                                  <input
-                                    type="text"
-                                    value={a.name}
-                                    onChange={(e) => handleUpdatePointAssignment(a.id, "name", e.target.value)}
-                                    className={`w-full text-sm font-medium bg-transparent border-b focus:border-indigo-500 focus:outline-none py-1 ${
-                                      darkMode ? "text-zinc-200 border-zinc-700" : "text-zinc-805 border-zinc-300"
-                                    }`}
-                                  />
+                        {/* POINTS MODE */}
+                        {activeCourse.gradingMode === "points" && (
+                          <div className="p-4 sm:p-6">
+                            {activeCourse.pointsAssignments.length === 0 ? (
+                              <div className="p-12 text-center text-zinc-500">
+                                <p className={`font-medium ${darkMode ? "text-zinc-350" : "text-zinc-650"}`}>No assignments added yet.</p>
+                                <p className="text-sm mt-1">Add assignments manually or use AI syllabus import.</p>
+                              </div>
+                            ) : (
+                              <div className="space-y-4">
+                                <div className={`grid grid-cols-12 gap-3 pb-3 text-xs font-semibold uppercase tracking-wide border-b ${
+                                  darkMode ? "text-zinc-455 border-zinc-800" : "text-zinc-500 border-zinc-200"
+                                }`}>
+                                  <div className="col-span-5">Assignment Title</div>
+                                  <div className="col-span-3 text-center">Score / Max</div>
+                                  <div className="col-span-2 text-center">Graded?</div>
+                                  <div className="col-span-2 text-center">Remove</div>
                                 </div>
-                                <div className="col-span-3 flex justify-center items-center gap-1.5">
-                                  {a.completed ? (
-                                    <>
+                                {activeCourse.pointsAssignments.map((a) => (
+                                  <div key={a.id} className="grid grid-cols-12 gap-3 items-center py-1">
+                                    <div className="col-span-5">
+                                      <input
+                                        type="text"
+                                        value={a.name}
+                                        onChange={(e) => handleUpdatePointAssignment(a.id, "name", e.target.value)}
+                                        className={`w-full text-sm font-medium bg-transparent border-b focus:border-indigo-500 focus:outline-none py-1 ${
+                                          darkMode ? "text-zinc-200 border-zinc-700" : "text-zinc-805 border-zinc-300"
+                                        }`}
+                                      />
+                                    </div>
+                                    <div className="col-span-3 flex justify-center items-center gap-1.5">
+                                      {a.completed ? (
+                                        <>
+                                          <input
+                                            type="number"
+                                            value={a.score}
+                                            onChange={(e) => handleUpdatePointAssignment(a.id, "score", Math.max(0, Number(e.target.value)))}
+                                            className={`w-16 text-center text-sm font-medium bg-transparent border rounded py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 ${
+                                              darkMode ? "text-white border-zinc-700" : "text-zinc-900 border-zinc-300"
+                                            }`}
+                                          />
+                                          <span className="text-zinc-400 dark:text-zinc-505 font-medium">/</span>
+                                        </>
+                                      ) : (
+                                        <span className={`text-xs font-medium px-2 py-1.5 rounded mr-1 border ${
+                                          darkMode ? "bg-zinc-850 border-zinc-700 text-zinc-400" : "bg-zinc-100 border-zinc-200 text-zinc-500"
+                                        }`}>
+                                          Pending
+                                        </span>
+                                      )}
                                       <input
                                         type="number"
-                                        value={a.score}
-                                        onChange={(e) => handleUpdatePointAssignment(a.id, "score", Math.max(0, Number(e.target.value)))}
+                                        value={a.total}
+                                        onChange={(e) => handleUpdatePointAssignment(a.id, "total", Math.max(1, Number(e.target.value)))}
                                         className={`w-16 text-center text-sm font-medium bg-transparent border rounded py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 ${
                                           darkMode ? "text-white border-zinc-700" : "text-zinc-900 border-zinc-300"
                                         }`}
                                       />
-                                      <span className="text-zinc-400 dark:text-zinc-505 font-medium">/</span>
-                                    </>
-                                  ) : (
-                                    <span className={`text-xs font-medium px-2 py-1.5 rounded mr-1 border ${
-                                      darkMode ? "bg-zinc-850 border-zinc-700 text-zinc-400" : "bg-zinc-100 border-zinc-200 text-zinc-500"
-                                    }`}>
-                                      Pending
-                                    </span>
-                                  )}
-                                  <input
-                                    type="number"
-                                    value={a.total}
-                                    onChange={(e) => handleUpdatePointAssignment(a.id, "total", Math.max(1, Number(e.target.value)))}
-                                    className={`w-16 text-center text-sm font-medium bg-transparent border rounded py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 ${
-                                      darkMode ? "text-white border-zinc-700" : "text-zinc-900 border-zinc-300"
-                                    }`}
-                                  />
-                                </div>
-                                <div className="col-span-2 flex justify-center">
-                                  <button
-                                    onClick={() => handleUpdatePointAssignment(a.id, "completed", !a.completed)}
-                                    className={`w-6 h-6 flex items-center justify-center rounded border transition-colors cursor-pointer ${
-                                      a.completed 
-                                        ? "bg-indigo-600 border-indigo-600 dark:bg-indigo-700 dark:border-indigo-705 text-white" 
-                                        : "bg-white dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700 text-transparent"
-                                    }`}
-                                  >
-                                    <Check size={14} strokeWidth={3} />
-                                  </button>
-                                </div>
-                                <div className="col-span-2 flex justify-center">
-                                  <button
-                                    onClick={() => handleDeletePointAssignment(a.id)}
-                                    className={`p-1.5 rounded-md transition-colors cursor-pointer ${
-                                      darkMode ? "text-zinc-405 hover:text-red-400 hover:bg-red-950/20" : "text-zinc-400 hover:text-red-600 hover:bg-red-50"
-                                    }`}
-                                  >
-                                    <Trash2 size={16} />
-                                  </button>
-                                </div>
+                                    </div>
+                                    <div className="col-span-2 flex justify-center">
+                                      <button
+                                        onClick={() => handleUpdatePointAssignment(a.id, "completed", !a.completed)}
+                                        className={`w-6 h-6 flex items-center justify-center rounded border transition-colors cursor-pointer ${
+                                          a.completed 
+                                            ? "bg-indigo-600 border-indigo-600 dark:bg-indigo-700 dark:border-indigo-705 text-white" 
+                                            : "bg-white dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700 text-transparent"
+                                        }`}
+                                      >
+                                        <Check size={14} strokeWidth={3} />
+                                      </button>
+                                    </div>
+                                    <div className="col-span-2 flex justify-center">
+                                      <button
+                                        onClick={() => handleDeletePointAssignment(a.id)}
+                                        className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                                          darkMode ? "text-zinc-405 hover:text-red-400 hover:bg-red-950/20" : "text-zinc-400 hover:text-red-650 hover:bg-red-50"
+                                        }`}
+                                      >
+                                        <Trash2 size={16} />
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
-                            ))}
+                            )}
                           </div>
                         )}
                       </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Calculations Column */}
-              <div className="lg:col-span-5 space-y-8">
-                {/* SUMMARY CARD */}
-                <div className={`p-6 rounded-xl border space-y-6 ${
-                  darkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
-                }`}>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h4 className={`font-semibold text-xs uppercase tracking-wide ${darkMode ? "text-zinc-450" : "text-zinc-500"}`}>Current Standing</h4>
-                      <p className={`text-4xl font-bold mt-1 ${darkMode ? "text-white" : "text-zinc-900"}`}>
-                        {((gradingMode === "weighted" ? weightedCategories.length : pointsAssignments.length) === 0)
-                          ? "—"
-                          : `${currentGradeResults.currentOverallGrade}%`}
-                      </p>
                     </div>
-                    <div className={`p-2.5 rounded-lg border ${
-                      darkMode ? "bg-zinc-800 border-zinc-700 text-zinc-300" : "bg-zinc-50 border-zinc-200 text-zinc-650"
+                  </div>
+
+                  {/* Calculations Column */}
+                  <div className="lg:col-span-4 space-y-8">
+                    {/* SUMMARY CARD */}
+                    <div className={`p-6 rounded-xl border space-y-6 ${
+                      darkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
                     }`}>
-                      <TrendingUp size={20} />
-                    </div>
-                  </div>
-
-                  <div className={`border-t pt-5 space-y-4 ${darkMode ? "border-zinc-800" : "border-zinc-100"}`}>
-                    <div className="flex justify-between items-center text-sm">
-                      <span className={`font-medium ${darkMode ? "text-zinc-350" : "text-zinc-650"}`}>Desired Target Grade:</span>
-                      <span className={`font-semibold ${darkMode ? "text-white" : "text-zinc-900"}`}>{desiredGrade}%</span>
-                    </div>
-
-                    {((gradingMode === "weighted" ? weightedCategories.length : pointsAssignments.length) === 0) ? (
-                      <div className={`p-4 rounded-lg border text-sm flex gap-2 ${
-                        darkMode ? "bg-zinc-950/40 border-zinc-800 text-zinc-400" : "bg-zinc-50 border-zinc-200 text-zinc-550"
-                      }`}>
-                        <Info size={18} className={`shrink-0 ${darkMode ? "text-zinc-500" : "text-zinc-400"}`} />
-                        <span>Add assignments or categories to view your required score projections.</span>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className={`font-semibold text-xs uppercase tracking-wide ${darkMode ? "text-zinc-450" : "text-zinc-505"}`}>Current Standing</h4>
+                          <p className={`text-4xl font-bold mt-1 ${darkMode ? "text-white" : "text-zinc-900"}`}>
+                            {((activeCourse.gradingMode === "weighted" ? activeCourse.weightedCategories.length : activeCourse.pointsAssignments.length) === 0)
+                              ? "—"
+                              : `${currentGradeResults.currentOverallGrade}%`}
+                          </p>
+                        </div>
+                        <div className={`p-2.5 rounded-lg border ${
+                          darkMode ? "bg-zinc-800 border-zinc-700 text-zinc-300" : "bg-zinc-50 border-zinc-200 text-zinc-650"
+                        }`}>
+                          <TrendingUp size={20} />
+                        </div>
                       </div>
-                    ) : currentGradeResults.requiredScoreOnPending !== null ? (
-                      <div className={`p-4 rounded-lg border space-y-2 ${
-                        darkMode ? "bg-indigo-950/20 border-indigo-900/50" : "bg-indigo-50 border-indigo-100"
-                      }`}>
-                        <h4 className={`text-xs font-semibold uppercase tracking-wide ${darkMode ? "text-indigo-400" : "text-indigo-805"}`}>Required Target</h4>
-                        <p className={`text-sm font-medium leading-relaxed ${darkMode ? "text-indigo-300" : "text-indigo-900"}`}>
-                          To achieve an overall grade of <strong>{desiredGrade}%</strong>, you need to average at least{" "}
-                          <strong className={`text-lg px-1.5 rounded ${
-                            darkMode ? "bg-indigo-900 text-indigo-200" : "bg-indigo-200 text-indigo-900"
+
+                      <div className={`border-t pt-5 space-y-4 ${darkMode ? "border-zinc-800" : "border-zinc-100"}`}>
+                        <div className="flex justify-between items-center text-sm">
+                          <span className={`font-medium ${darkMode ? "text-zinc-350" : "text-zinc-650"}`}>Desired Target Grade:</span>
+                          <span className={`font-semibold ${darkMode ? "text-white" : "text-zinc-900"}`}>{activeCourse.desiredGrade}%</span>
+                        </div>
+
+                        {((activeCourse.gradingMode === "weighted" ? activeCourse.weightedCategories.length : activeCourse.pointsAssignments.length) === 0) ? (
+                          <div className={`p-4 rounded-lg border text-sm flex gap-2 ${
+                            darkMode ? "bg-zinc-950/40 border-zinc-800 text-zinc-400" : "bg-zinc-50 border-zinc-200 text-zinc-550"
                           }`}>
-                            {currentGradeResults.requiredScoreOnPending > 100 
-                              ? "Extra Credit needed (>100%)" 
-                              : `${currentGradeResults.requiredScoreOnPending}%`}
-                          </strong> on your remaining{" "}
-                          {gradingMode === "weighted"
-                            ? `pending weight (${(currentGradeResults as any).pendingWeight}%)`
-                            : `pending assignments (${(currentGradeResults as any).pendingPoints} pts)`}
-                          .
+                            <Info size={18} className={`shrink-0 ${darkMode ? "text-zinc-500" : "text-zinc-400"}`} />
+                            <span>Add assignments or categories to view your required score projections.</span>
+                          </div>
+                        ) : currentGradeResults.requiredScoreOnPending !== null ? (
+                          <div className={`p-4 rounded-lg border space-y-2 ${
+                            darkMode ? "bg-indigo-950/20 border-indigo-900/50" : "bg-indigo-50 border-indigo-105"
+                          }`}>
+                            <h4 className={`text-xs font-semibold uppercase tracking-wide ${darkMode ? "text-indigo-400" : "text-indigo-800"}`}>Required Target</h4>
+                            <p className={`text-sm font-medium leading-relaxed ${darkMode ? "text-indigo-300" : "text-indigo-905"}`}>
+                              To achieve an overall grade of <strong>{activeCourse.desiredGrade}%</strong>, you need to average at least{" "}
+                              <strong className={`text-lg px-1.5 rounded ${
+                                darkMode ? "bg-indigo-900 text-indigo-205" : "bg-indigo-200 text-indigo-900"
+                              }`}>
+                                {currentGradeResults.requiredScoreOnPending > 100 
+                                  ? "Extra Credit needed (>100%)" 
+                                  : `${currentGradeResults.requiredScoreOnPending}%`}
+                              </strong> on your remaining{" "}
+                              {activeCourse.gradingMode === "weighted"
+                                ? `pending weight (${(currentGradeResults as any).pendingWeight}%)`
+                                : `pending assignments (${(currentGradeResults as any).pendingPoints} pts)`}
+                              .
                         </p>
                       </div>
                     ) : (
@@ -1183,8 +1371,8 @@ export default function GradeCheckerApp() {
                 <div className={`p-6 rounded-xl border space-y-4 ${
                   darkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
                 }`}>
-                  <div className={`border-b pb-3 ${darkMode ? "border-zinc-800" : "border-zinc-100"}`}>
-                    <h4 className={`font-semibold ${darkMode ? "text-zinc-200" : "text-zinc-800"}`}>Score Projection Curve</h4>
+                  <div className={`border-b pb-3 ${darkMode ? "border-zinc-800" : "border-zinc-105"}`}>
+                    <h4 className={`font-semibold ${darkMode ? "text-zinc-205" : "text-zinc-800"}`}>Score Projection Curve</h4>
                     <p className={`text-xs mt-1 ${darkMode ? "text-zinc-400" : "text-zinc-500"}`}>Visualizes potential final grades based on remaining coursework.</p>
                   </div>
                   
@@ -1215,20 +1403,20 @@ export default function GradeCheckerApp() {
                         );
                       })}
 
-                      {desiredGrade > 0 && desiredGrade <= 120 && (
+                      {activeCourse.desiredGrade > 0 && activeCourse.desiredGrade <= 120 && (
                         <g>
                           <line
-                            x1={graphPadding.left} y1={getSvgCoords(0, desiredGrade).y}
-                            x2={graphWidth - graphPadding.right} y2={getSvgCoords(100, desiredGrade).y}
+                            x1={graphPadding.left} y1={getSvgCoords(0, activeCourse.desiredGrade).y}
+                            x2={graphWidth - graphPadding.right} y2={getSvgCoords(100, activeCourse.desiredGrade).y}
                             stroke="#ef4444" strokeWidth="1.5" strokeDasharray="5 3"
                           />
                           <text
-                            x={graphWidth - graphPadding.right - 5} y={getSvgCoords(0, desiredGrade).y - 8}
+                            x={graphWidth - graphPadding.right - 5} y={getSvgCoords(0, activeCourse.desiredGrade).y - 8}
                             textAnchor="end" fontSize="10" className={`font-semibold uppercase ${
-                              darkMode ? "fill-red-400" : "fill-red-600"
+                              darkMode ? "fill-red-400" : "fill-red-650"
                             }`}
                           >
-                            Target: {desiredGrade}%
+                            Target: {activeCourse.desiredGrade}%
                           </text>
                         </g>
                       )}
@@ -1279,7 +1467,7 @@ export default function GradeCheckerApp() {
                           <g key={val}>
                             <line x1={x} y1={y} x2={x} y2={y + 5} stroke={darkMode ? "#3f3f46" : "#94a3b8"} strokeWidth="1.5" />
                             <text x={x} y={y + 18} textAnchor="middle" fontSize="10" className={`font-medium ${
-                              darkMode ? "fill-zinc-400" : "fill-zinc-600"
+                              darkMode ? "fill-zinc-400" : "fill-zinc-605"
                             }`}>
                               {val}%
                             </text>
@@ -1300,6 +1488,14 @@ export default function GradeCheckerApp() {
                   </div>
                 </div>
               </div>
+                </>
+              ) : (
+                <div className="col-span-9 text-center p-12">
+                  <BookOpen className="mx-auto mb-4 text-zinc-400" size={48} />
+                  <p className="font-semibold text-lg">No Active Course Loaded</p>
+                  <p className="text-sm text-zinc-500 mt-1">Select or create a course from the sidebar dashboard to get started.</p>
+                </div>
+              )}
             </motion.div>
           )}
 
@@ -1318,9 +1514,9 @@ export default function GradeCheckerApp() {
                 <div className={`p-6 rounded-xl border space-y-5 ${
                   darkMode ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
                 }`}>
-                  <div className={`flex justify-between items-center border-b pb-3 ${darkMode ? "border-zinc-800" : "border-zinc-100"}`}>
+                  <div className={`flex justify-between items-center border-b pb-3 ${darkMode ? "border-zinc-800" : "border-zinc-101"}`}>
                     <h3 className={`font-semibold flex items-center gap-2 ${darkMode ? "text-zinc-200" : "text-zinc-850"}`}>
-                      <Settings size={18} className={darkMode ? "text-zinc-405" : "text-zinc-500"} /> GPA Grading Rules
+                      <Settings size={18} className={darkMode ? "text-zinc-400" : "text-zinc-500"} /> GPA Grading Rules
                     </h3>
                     <button
                       onClick={() => setShowScaleConfig(!showScaleConfig)}
@@ -1340,7 +1536,7 @@ export default function GradeCheckerApp() {
                     </span>
                     <div className="grid grid-cols-3 gap-3">
                       <div>
-                        <label className={`block text-xs mb-1 ${darkMode ? "text-zinc-400" : "text-zinc-500"}`}>Honors</label>
+                        <label className={`block text-xs mb-1 ${darkMode ? "text-zinc-405" : "text-zinc-500"}`}>Honors</label>
                         <input
                           type="number" step="0.1" min="0"
                           value={weightingConfig.honorsBoost}
@@ -1376,7 +1572,7 @@ export default function GradeCheckerApp() {
                   </div>
 
                   {showScaleConfig ? (
-                    <div className={`pt-4 border-t ${darkMode ? "border-zinc-800" : "border-zinc-100"}`}>
+                    <div className={`pt-4 border-t ${darkMode ? "border-zinc-800" : "border-zinc-101"}`}>
                       <span className={`block text-xs font-semibold uppercase tracking-wide mb-3 ${
                         darkMode ? "text-zinc-400" : "text-zinc-500"
                       }`}>Scale Editor</span>
@@ -1398,7 +1594,7 @@ export default function GradeCheckerApp() {
                               />
                             </div>
                             <div className="flex items-center gap-2">
-                              <span className="text-xs text-zinc-555">Min %:</span>
+                              <span className="text-xs text-zinc-550">Min %:</span>
                               <input
                                 type="number" min="0" max="100"
                                 value={r.minPercent}
@@ -1413,9 +1609,9 @@ export default function GradeCheckerApp() {
                       </div>
                     </div>
                   ) : (
-                    <div className={`pt-4 border-t ${darkMode ? "border-zinc-800" : "border-zinc-100"}`}>
+                    <div className={`pt-4 border-t ${darkMode ? "border-zinc-800" : "border-zinc-101"}`}>
                       <span className={`block text-xs font-semibold uppercase tracking-wide mb-3 ${
-                        darkMode ? "text-zinc-400" : "text-zinc-500"
+                        darkMode ? "text-zinc-400" : "text-zinc-505"
                       }`}>Scale Preview</span>
                       <div className="grid grid-cols-4 gap-2">
                         {gpaRules.slice(0, 8).map((r) => (
@@ -1450,7 +1646,7 @@ export default function GradeCheckerApp() {
                     <h4 className={`font-semibold text-xs uppercase tracking-wide ${darkMode ? "text-indigo-400" : "text-indigo-700"}`}>Weighted GPA</h4>
                     <p className={`text-5xl font-bold mt-2 ${darkMode ? "text-indigo-200" : "text-indigo-900"}`}>{gpaResult.weightedGPA.toFixed(2)}</p>
                     <span className={`text-xs font-semibold mt-3 border px-3 py-1 rounded-full ${
-                      darkMode ? "bg-zinc-900 border-indigo-900 text-indigo-300" : "bg-white border-indigo-200 text-indigo-800"
+                      darkMode ? "bg-zinc-900 border-indigo-900 text-indigo-300" : "bg-white border-indigo-200 text-indigo-805"
                     }`}>
                       {gpaResult.totalCredits} Total Credits
                     </span>
@@ -1469,7 +1665,7 @@ export default function GradeCheckerApp() {
                       <button
                         onClick={handleAddGPACourse}
                         className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white rounded-md transition-colors cursor-pointer ${
-                          darkMode ? "bg-indigo-755 hover:bg-indigo-650" : "bg-indigo-600 hover:bg-indigo-700"
+                          darkMode ? "bg-indigo-700 hover:bg-indigo-650" : "bg-indigo-600 hover:bg-indigo-700"
                         }`}
                       >
                         <Plus size={16} /> <span>Add New Course</span>
@@ -1481,7 +1677,7 @@ export default function GradeCheckerApp() {
                     {gpaCourses.length === 0 ? (
                       <div className="text-center p-12">
                         <p className={`font-medium ${darkMode ? "text-zinc-350" : "text-zinc-650"}`}>No courses mapped out yet.</p>
-                        <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Click "Add New Course" to start planning your GPA.</p>
+                        <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Click "Add New Course" to start planning or sync details straight from your main Course Dashboard!</p>
                       </div>
                     ) : (
                       <div className="space-y-4">
@@ -1585,7 +1781,7 @@ export default function GradeCheckerApp() {
                 }`}
               >
                 <div className={`px-6 py-4 border-b flex justify-between items-center ${
-                  darkMode ? "border-zinc-800 bg-zinc-900/60" : "border-zinc-100 bg-zinc-50"
+                  darkMode ? "border-zinc-800 bg-zinc-900/60" : "border-zinc-101 bg-zinc-50"
                 }`}>
                   <h3 className={`font-semibold flex items-center gap-2 ${darkMode ? "text-white" : "text-zinc-900"}`}>
                     <Sparkles size={18} className={darkMode ? "text-indigo-400" : "text-indigo-600"} /> AI Syllabus & Grades Importer
@@ -1617,7 +1813,7 @@ export default function GradeCheckerApp() {
                         value={syllabusText}
                         onChange={(e) => setSyllabusText(e.target.value)}
                         className={`w-full text-sm p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none placeholder:text-zinc-400 ${
-                          darkMode ? "border-zinc-750 bg-zinc-950 text-white" : "border-zinc-300 bg-zinc-50 text-zinc-900"
+                          darkMode ? "border-zinc-750 bg-zinc-955 text-white" : "border-zinc-300 bg-zinc-50 text-zinc-900"
                         }`}
                         placeholder="Example: Homework - 25%, Projects - 35%, Quizzes - 40%..."
                       />
@@ -1634,7 +1830,7 @@ export default function GradeCheckerApp() {
                         value={currentGradesText}
                         onChange={(e) => setCurrentGradesText(e.target.value)}
                         className={`w-full text-sm p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none placeholder:text-zinc-400 ${
-                          darkMode ? "border-zinc-750 bg-zinc-950 text-white" : "border-zinc-300 bg-zinc-50 text-zinc-900"
+                          darkMode ? "border-zinc-750 bg-zinc-955 text-white" : "border-zinc-300 bg-zinc-50 text-zinc-900"
                         }`}
                         placeholder="Paste text from your grade portal or PDF list of scored assignments..."
                       />
@@ -1643,7 +1839,7 @@ export default function GradeCheckerApp() {
 
                   {parseError && (
                     <div className={`p-3 border rounded-md text-sm flex gap-2 items-start ${
-                      darkMode ? "bg-red-950/20 border-red-900/50 text-red-300" : "bg-red-50 border-red-200 text-red-700"
+                      darkMode ? "bg-red-950/20 border-red-900/50 text-red-300" : "bg-red-50 border-red-250 text-red-700"
                     }`}>
                       <Info size={16} className="shrink-0 mt-0.5" />
                       <span>{parseError}</span>
@@ -1657,7 +1853,7 @@ export default function GradeCheckerApp() {
                   <button
                     onClick={() => setShowImportDialog(false)}
                     className={`px-4 py-2 text-sm font-medium border rounded-md transition-colors ${
-                      darkMode ? "text-zinc-300 bg-zinc-800 border-zinc-700 hover:bg-zinc-750" : "text-zinc-700 bg-white border-zinc-300 hover:bg-zinc-100"
+                      darkMode ? "text-zinc-350 bg-zinc-800 border-zinc-700 hover:bg-zinc-750" : "text-zinc-705 bg-white border-zinc-300 hover:bg-zinc-100"
                     }`}
                   >
                     Cancel
