@@ -16,6 +16,9 @@ First, fork this repository and make sure to give credit to Robot3-track. Then, 
 Below is your API setup guide.
 Gemini Key = GEMINI_API_KEY = (your_api_key)
 
+# UI Featuers
+The app currently features light/dark mode, GPA/Grade inputs, and AI syllabus inputs.
+
 # Try it now!
 Try the live deployment at: https://gpacheck.vercel.app . This is the official deployment.
 
