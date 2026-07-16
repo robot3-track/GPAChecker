@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Calculator,
@@ -12,14 +12,14 @@ import {
   X,
   Check,
   RotateCcw,
+  FileText,
   Info,
   ChevronDown,
   ChevronRight,
   Settings,
+  Percent,
   PlusCircle,
-  Sun,
-  Moon,
-  Upload
+  HelpCircle
 } from "lucide-react";
 
 // Types
@@ -54,6 +54,7 @@ interface GPAScaleRule {
   minPercent: number;
 }
 
+// Standard scale, but honestly check your teacher's syllabus because some of them do not believe in A+ and it completely ruins your semester goals lol.
 const DEFAULT_GPA_SCALE: GPAScaleRule[] = [
   { grade: "A+", points: 4.0, minPercent: 98},
   { grade: "A", points: 4.0, minPercent: 93 },
@@ -70,28 +71,8 @@ const DEFAULT_GPA_SCALE: GPAScaleRule[] = [
 ];
 
 export default function GradeCheckerApp() {
+  // Navigation / Tabs
   const [activeTab, setActiveTab] = useState<"class" | "gpa">("class");
-  
-  // Theme state
-  const [darkMode, setDarkMode] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("gc_darkMode");
-      if (stored) return stored === "true";
-      return window.matchMedia("(prefers-color-scheme: dark)").matches;
-    }
-    return false;
-  });
-
-  // Apply dark mode class to html element
-  useEffect(() => {
-    const root = window.document.documentElement;
-    if (darkMode) {
-      root.classList.add("dark");
-    } else {
-      root.classList.remove("dark");
-    }
-    localStorage.setItem("gc_darkMode", String(darkMode));
-  }, [darkMode]);
 
   // --- CLASS GRADE CHECKER STATE ---
   const [classTitle, setClassTitle] = useState<string>(() => {
@@ -148,6 +129,7 @@ export default function GradeCheckerApp() {
       const stored = localStorage.getItem("gc_weightingConfig");
       if (stored) return JSON.parse(stored);
     }
+    //  AP and IB get full 1.0 boost at our school. Honors gets 0.5, but this is all changeable of course lol with the settings (my school doesn't do 0.5, does 1, but my school is unqiue afterall)
     return {
       regularBoost: 0,
       honorsBoost: 0.5,
@@ -166,10 +148,9 @@ export default function GradeCheckerApp() {
     return [];
   });
 
-  // --- AI IMPORT DIALOG ---
+  // --- AI SYLLABUS IMPORT DIALOG ---
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [syllabusText, setSyllabusText] = useState("");
-  const [currentGradesText, setCurrentGradesText] = useState("");
   const [isParsing, setIsParsing] = useState(false);
   const [parseError, setParseError] = useState("");
 
@@ -228,6 +209,15 @@ export default function GradeCheckerApp() {
     }
   };
 
+  const resetGPAData = () => {
+    if (confirm("Are you sure you want to reset your GPA planner? This action cannot be undone.")) {
+      localStorage.removeItem("gc_gpaCourses");
+      localStorage.removeItem("gc_gpaRules");
+      localStorage.removeItem("gc_weightingConfig");
+      window.location.reload();
+    }
+  };
+
   // --- MATH CALCULATIONS ---
   const calculateWeightedGrade = () => {
     let totalWeight = 0;
@@ -258,6 +248,8 @@ export default function GradeCheckerApp() {
       requiredScoreOnPending = ((desiredGrade - earnedWeightContribution) / pendingWeight) * 100;
     }
 
+    // STUDENT COMMENT: Added a strict 120% cap here. Otherwise, if you are failing a class 
+    // and set your target to a 98%, the required score goes to like 450% and breaks the SVG bounding box.
     const finalRequired = requiredScoreOnPending !== null ? Math.min(120, Math.round(requiredScoreOnPending * 100) / 100) : null;
 
     return {
@@ -289,6 +281,7 @@ export default function GradeCheckerApp() {
       requiredScoreOnPending = (remainingPointsNeeded / pendingPoints) * 100;
     }
 
+    // Extra credit happens, so we allow up to 120% projection max, but absolutely nothing higher so people don't break the layout with unreal inputs.
     const finalRequired = requiredScoreOnPending !== null ? Math.min(120, Math.round(requiredScoreOnPending * 100) / 100) : null;
 
     return {
@@ -474,10 +467,7 @@ export default function GradeCheckerApp() {
       const res = await fetch("/api/parse-syllabus", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          text: syllabusText,
-          gradesText: currentGradesText // Passing both syllabus & currently achieved grades to the parser!
-        }),
+        body: JSON.stringify({ text: syllabusText }),
       });
 
       if (!res.ok) {
@@ -498,9 +488,9 @@ export default function GradeCheckerApp() {
               id: String(idx + 1),
               name: cat.name,
               weight: cat.weight || 10,
-              currentScore: isFinal ? null : (cat.currentScore !== undefined ? cat.currentScore : 90),
+              currentScore: isFinal ? null : 90,
               isExpanded: false,
-              items: cat.items || [],
+              items: [],
             };
           });
           saveWeightedCategories(formattedCategories);
@@ -510,7 +500,7 @@ export default function GradeCheckerApp() {
             return {
               id: String(idx + 1),
               name: cat.name,
-              score: isFinal ? 0 : (cat.score !== undefined ? cat.score : Math.round((cat.totalPoints || 100) * 0.9)), 
+              score: isFinal ? 0 : Math.round((cat.totalPoints || 100) * 0.9), 
               total: cat.totalPoints || 100,
               completed: !isFinal,
             };
@@ -531,13 +521,12 @@ export default function GradeCheckerApp() {
 
         setShowImportDialog(false);
         setSyllabusText("");
-        setCurrentGradesText("");
       } else {
-        throw new Error("Could not extract grading system cleanly. Please check the text inputs.");
+        throw new Error("Could not extract grading system cleanly. Please check the text and try again.");
       }
     } catch (err: any) {
       console.error(err);
-      setParseError(err.message || "Something went wrong while processing your imports.");
+      setParseError(err.message || "Something went wrong while processing your syllabus.");
     } finally {
       setIsParsing(false);
     }
@@ -548,6 +537,7 @@ export default function GradeCheckerApp() {
   const graphWidth = 460;
   const graphHeight = 220;
 
+  // The Y-axis maxes out elegantly at 120 so the curve doesn't clip out into space if you have a massive extra credit score.
   const getSvgCoords = (xVal: number, yVal: number) => {
     const clampedY = Math.min(120, Math.max(0, yVal));
     const xRange = graphWidth - graphPadding.left - graphPadding.right;
@@ -621,61 +611,49 @@ export default function GradeCheckerApp() {
     : "";
 
   const targetRequiredScore = currentGradeResults.requiredScoreOnPending;
+  // The horizontal/vertical line helper stays hidden if you need higher than 120% because that means it's physically impossible anyway.
   const isTargetVisible = targetRequiredScore !== null && targetRequiredScore >= 0 && targetRequiredScore <= 120;
   const targetCoords = isTargetVisible ? getSvgCoords(targetRequiredScore, desiredGrade) : null;
 
   const scaleGridLines = [110, 90, 70, 50];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8 font-sans text-zinc-900 dark:text-zinc-100 bg-zinc-50 dark:bg-zinc-950 min-h-screen transition-colors duration-200">
-      
+    <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8 font-sans text-gray-900 bg-gray-50 min-h-screen">
       {/* HEADER SECTION */}
-      <div className="mb-12 flex flex-col md:flex-row md:items-center md:justify-between pb-8 border-b border-zinc-200 dark:border-zinc-800 gap-6">
+      <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between pb-6 border-b border-gray-200">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-white">
+          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
             Grade & GPA Checker
           </h1>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-2">
-            Built by a student, for students. Calculate required final scores and project semester outcomes.
+          <p className="text-sm text-gray-500 mt-1">
+            Built by a student, for students. Calculate required finasl scores and project semester outcomes.
           </p>
         </div>
 
-        {/* Global Controls & Navigation */}
-        <div className="flex flex-wrap items-center gap-4">
-          {/* Theme Toggle */}
+        {/* Navigation Tabs */}
+        <div className="flex gap-2 mt-4 md:mt-0 bg-gray-200 p-1 rounded-lg">
           <button
-            onClick={() => setDarkMode(!darkMode)}
-            className="p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-            aria-label="Toggle theme"
+            onClick={() => setActiveTab("class")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium text-sm transition-colors cursor-pointer ${
+              activeTab === "class"
+                ? "bg-white text-gray-900 shadow-sm"
+                : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+            }`}
           >
-            {darkMode ? <Sun size={18} /> : <Moon size={18} />}
+            <Calculator size={16} />
+            <span>Class Grade Calculator</span>
           </button>
-
-          {/* Navigation Tabs */}
-          <div className="flex gap-1.5 bg-zinc-200 dark:bg-zinc-900 p-1.5 rounded-lg">
-            <button
-              onClick={() => setActiveTab("class")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium text-sm transition-colors cursor-pointer ${
-                activeTab === "class"
-                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-none"
-                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
-              }`}
-            >
-              <Calculator size={16} />
-              <span>Class Grade Calculator</span>
-            </button>
-            <button
-              onClick={() => setActiveTab("gpa")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium text-sm transition-colors cursor-pointer ${
-                activeTab === "gpa"
-                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-none"
-                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
-              }`}
-            >
-              <GraduationCap size={16} />
-              <span>Semester GPA Planner</span>
-            </button>
-          </div>
+          <button
+            onClick={() => setActiveTab("gpa")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium text-sm transition-colors cursor-pointer ${
+              activeTab === "gpa"
+                ? "bg-white text-gray-900 shadow-sm"
+                : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+            }`}
+          >
+            <GraduationCap size={16} />
+            <span>Semester GPA Planner</span>
+          </button>
         </div>
       </div>
 
@@ -688,31 +666,31 @@ export default function GradeCheckerApp() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.15 }}
-            className="grid grid-cols-1 lg:grid-cols-12 gap-8"
+            className="grid grid-cols-1 lg:grid-cols-12 gap-6"
           >
             {/* Input Column */}
-            <div className="lg:col-span-7 space-y-8">
+            <div className="lg:col-span-7 space-y-6">
               {/* Class Configuration Card */}
-              <div className="bg-white dark:bg-zinc-900 p-6 rounded-xl border border-zinc-200 dark:border-zinc-800 space-y-6">
-                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 border-b border-zinc-100 dark:border-zinc-800 pb-5">
+              <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-5">
+                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 border-b border-gray-100 pb-5">
                   <input
                     type="text"
                     value={classTitle}
                     onChange={(e) => saveClassTitle(e.target.value)}
-                    className="text-xl font-semibold text-zinc-900 dark:text-white bg-transparent border-b border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-600 focus:border-indigo-500 focus:outline-none py-1 w-full max-w-sm transition-colors"
+                    className="text-xl font-semibold text-gray-900 bg-transparent border-b border-gray-300 hover:border-gray-400 focus:border-blue-500 focus:outline-none py-1 w-full max-w-sm transition-colors"
                     placeholder="Enter Course Title..."
                   />
                   <div className="flex gap-2 shrink-0">
                     <button
                       onClick={() => setShowImportDialog(true)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900/50 hover:bg-indigo-100 dark:hover:bg-indigo-950 rounded-md transition-colors cursor-pointer"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 rounded-md transition-colors cursor-pointer shadow-sm"
                     >
                       <Sparkles size={14} />
-                      <span>Smart Import</span>
+                      <span>Import Syllabus with AI</span>
                     </button>
                     <button
                       onClick={resetClassData}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-zinc-600 dark:text-zinc-400 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-750 rounded-md transition-colors cursor-pointer"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 rounded-md transition-colors cursor-pointer shadow-sm"
                       title="Clear all class data"
                     >
                       <RotateCcw size={14} />
@@ -721,18 +699,18 @@ export default function GradeCheckerApp() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-xs font-semibold text-zinc-500 dark:text-zinc-450 uppercase tracking-wider mb-3">
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
                       Grading Structure
                     </label>
-                    <div className="flex bg-zinc-100 dark:bg-zinc-950 p-1 rounded-lg border border-zinc-200 dark:border-zinc-850">
+                    <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-200 shadow-inner">
                       <button
                         onClick={() => saveGradingMode("weighted")}
                         className={`flex-1 py-1.5 px-3 text-sm font-medium rounded-md transition-colors cursor-pointer ${
                           gradingMode === "weighted"
-                            ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700"
-                            : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"
+                            ? "bg-white text-gray-900 shadow-sm border border-gray-200"
+                            : "text-gray-500 hover:text-gray-700"
                         }`}
                       >
                         Weighted
@@ -741,8 +719,8 @@ export default function GradeCheckerApp() {
                         onClick={() => saveGradingMode("points")}
                         className={`flex-1 py-1.5 px-3 text-sm font-medium rounded-md transition-colors cursor-pointer ${
                           gradingMode === "points"
-                            ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white border border-zinc-200 dark:border-zinc-700"
-                            : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"
+                            ? "bg-white text-gray-900 shadow-sm border border-gray-200"
+                            : "text-gray-500 hover:text-gray-700"
                         }`}
                       >
                         Total Points
@@ -751,8 +729,8 @@ export default function GradeCheckerApp() {
                   </div>
 
                   <div>
-                    <div className="flex justify-between items-center mb-3">
-                      <label className="block text-xs font-semibold text-zinc-500 dark:text-zinc-450 uppercase tracking-wider">
+                    <div className="flex justify-between items-center mb-2">
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">
                         Desired Target Grade
                       </label>
                     </div>
@@ -764,7 +742,7 @@ export default function GradeCheckerApp() {
                         step="0.5"
                         value={desiredGrade}
                         onChange={(e) => saveDesiredGrade(Number(e.target.value))}
-                        className="w-full h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                       />
                       <div className="flex items-center">
                         <input
@@ -773,9 +751,9 @@ export default function GradeCheckerApp() {
                           max="120"
                           value={desiredGrade}
                           onChange={(e) => saveDesiredGrade(Math.min(120, Math.max(0, Number(e.target.value))))}
-                          className="w-16 text-center text-sm font-semibold text-zinc-900 dark:text-white bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-md py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 shadow-none"
+                          className="w-16 text-center text-sm font-medium text-gray-900 border border-gray-300 rounded-md py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm"
                         />
-                        <span className="ml-1 text-zinc-500 dark:text-zinc-400 font-medium">%</span>
+                        <span className="ml-1 text-gray-500 font-medium">%</span>
                       </div>
                     </div>
                   </div>
@@ -783,14 +761,14 @@ export default function GradeCheckerApp() {
               </div>
 
               {/* Dynamic Grading List */}
-              <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
-                <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center bg-zinc-50 dark:bg-zinc-900/60">
-                  <h3 className="font-semibold text-zinc-800 dark:text-zinc-200">
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                  <h3 className="font-semibold text-gray-800">
                     {gradingMode === "weighted" ? "Categories & Weights" : "Assignment List"}
                   </h3>
                   <button
                     onClick={gradingMode === "weighted" ? handleAddCategory : handleAddPointAssignment}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-700 dark:hover:bg-indigo-650 rounded-md transition-colors cursor-pointer"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm transition-colors cursor-pointer"
                   >
                     <Plus size={16} />
                     <span>
@@ -799,23 +777,23 @@ export default function GradeCheckerApp() {
                   </button>
                 </div>
 
-                <div className="divide-y divide-zinc-100 dark:divide-zinc-800/80">
+                <div className="divide-y divide-gray-100">
                   {/* WEIGHTED MODE */}
                   {gradingMode === "weighted" && (
                     <>
                       {weightedCategories.length === 0 ? (
-                        <div className="p-12 text-center text-zinc-500">
-                          <p className="font-medium text-zinc-650 dark:text-zinc-350">No grading categories defined.</p>
-                          <p className="text-sm mt-1">Click "Add Grading Category" or use AI to import your syllabus & grades.</p>
+                        <div className="p-10 text-center text-gray-500">
+                          <p className="font-medium text-gray-600">No grading categories defined.</p>
+                          <p className="text-sm mt-1">Click "Add Grading Category" or use AI to import your syllabus.</p>
                         </div>
                       ) : (
                         weightedCategories.map((cat) => (
-                          <div key={cat.id} className="p-4 sm:p-6 transition-colors hover:bg-zinc-50/20 dark:hover:bg-zinc-850/20">
+                          <div key={cat.id} className="p-4 sm:p-6 transition-colors hover:bg-gray-50/50">
                             <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
                               <div className="flex items-center gap-3 flex-1">
                                 <button
                                   onClick={() => handleUpdateCategory(cat.id, "isExpanded", !cat.isExpanded)}
-                                  className="p-1.5 text-zinc-400 border border-zinc-200 dark:border-zinc-850 bg-white dark:bg-zinc-900 rounded-md hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:text-zinc-600 dark:hover:text-zinc-305 transition-colors cursor-pointer"
+                                  className="p-1.5 text-gray-400 border border-gray-200 bg-white rounded-md hover:bg-gray-50 hover:text-gray-600 transition-colors shadow-sm cursor-pointer"
                                 >
                                   {cat.isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                                 </button>
@@ -823,29 +801,29 @@ export default function GradeCheckerApp() {
                                   type="text"
                                   value={cat.name}
                                   onChange={(e) => handleUpdateCategory(cat.id, "name", e.target.value)}
-                                  className="font-medium text-zinc-905 dark:text-white border-b border-zinc-300 dark:border-zinc-700 bg-transparent hover:border-zinc-400 dark:hover:border-zinc-650 focus:border-indigo-500 dark:focus:border-indigo-500 focus:outline-none py-1 w-full max-w-[220px]"
+                                  className="font-medium text-gray-900 border-b border-gray-300 bg-transparent hover:border-gray-400 focus:border-blue-500 focus:outline-none py-1 w-full max-w-[220px]"
                                   placeholder="Category Name"
                                 />
                               </div>
 
                               <div className="flex items-center gap-5">
                                 <div className="flex items-center gap-2">
-                                  <span className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Weight:</span>
+                                  <span className="text-sm font-medium text-gray-500">Weight:</span>
                                   <div className="relative">
                                     <input
                                       type="number"
                                       value={cat.weight}
                                       onChange={(e) => handleUpdateCategory(cat.id, "weight", Math.max(0, Number(e.target.value)))}
-                                      className="w-16 text-center text-sm font-medium text-zinc-900 dark:text-white bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-md py-1 pr-4 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                      className="w-16 text-center text-sm font-medium text-gray-900 border border-gray-300 rounded-md py-1 pr-4 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm"
                                     />
-                                    <span className="absolute right-2 top-1.5 text-xs text-zinc-400 dark:text-zinc-500 font-medium">%</span>
+                                    <span className="absolute right-2 top-1.5 text-xs text-gray-400 font-medium">%</span>
                                   </div>
                                 </div>
 
                                 <div className="flex items-center gap-2">
-                                  <span className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Avg (Max=120%):</span>
+                                  <span className="text-sm font-medium text-gray-500">Avg (Max=120%):</span>
                                   {cat.items && cat.items.length > 0 ? (
-                                    <div className="bg-zinc-100 dark:bg-zinc-950 text-zinc-700 dark:text-zinc-300 font-medium text-sm py-1 px-3 rounded-md border border-zinc-200 dark:border-zinc-800">
+                                    <div className="bg-gray-100 text-gray-700 font-medium text-sm py-1 px-3 rounded-md border border-gray-200">
                                       {(
                                         Math.round(
                                           (cat.items.reduce((sum, i) => sum + i.score, 0) /
@@ -862,19 +840,20 @@ export default function GradeCheckerApp() {
                                         value={cat.currentScore === null ? "" : cat.currentScore}
                                         onChange={(e) => {
                                           const val = e.target.value;
+                                          // Max out single manual scores at 120% too so they don't break the individual item average layout rows.
                                           handleUpdateCategory(cat.id, "currentScore", val === "" ? null : Math.min(120, Number(val)));
                                         }}
-                                        className="w-16 text-center text-sm font-medium text-zinc-900 dark:text-white bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-md py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder:text-zinc-400 dark:placeholder:text-zinc-650"
+                                        className="w-16 text-center text-sm font-medium text-gray-900 border border-gray-300 rounded-md py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm placeholder:text-gray-400"
                                         placeholder="TBD"
                                       />
-                                      {cat.currentScore !== null && <span className="text-sm text-zinc-400">%</span>}
+                                      {cat.currentScore !== null && <span className="text-sm text-gray-400">%</span>}
                                     </div>
                                   )}
                                 </div>
 
                                 <button
                                   onClick={() => handleDeleteCategory(cat.id)}
-                                  className="p-1.5 text-zinc-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-md transition-colors cursor-pointer"
+                                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
                                   title="Delete Category"
                                 >
                                   <Trash2 size={18} />
@@ -884,19 +863,19 @@ export default function GradeCheckerApp() {
 
                             {/* Nested Items details */}
                             {cat.isExpanded && (
-                              <div className="mt-4 ml-8 pl-4 border-l-2 border-zinc-200 dark:border-zinc-800 space-y-3 bg-zinc-50/50 dark:bg-zinc-950/40 p-4 rounded-lg">
+                              <div className="mt-4 ml-8 pl-4 border-l-2 border-gray-200 space-y-3 bg-gray-50 p-4 rounded-lg">
                                 <div className="flex justify-between items-center mb-2">
-                                  <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-450 uppercase tracking-wide">Individual Assignments</span>
+                                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Individual Assignments</span>
                                   <button
                                     onClick={() => handleAddNestedItem(cat.id)}
-                                    className="flex items-center gap-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 px-2 py-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                                    className="flex items-center gap-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 px-2 py-1 rounded hover:bg-gray-100 transition-colors cursor-pointer shadow-sm"
                                   >
                                     <PlusCircle size={12} />
                                     <span>Add Item</span>
                                   </button>
                                 </div>
                                 {cat.items.length === 0 ? (
-                                  <p className="text-sm text-zinc-400 dark:text-zinc-500 italic">No specific assignments logged. Average is manually set above.</p>
+                                  <p className="text-sm text-gray-400 italic">No specific assignments logged. Average is manually set above.</p>
                                 ) : (
                                   <div className="space-y-2">
                                     {cat.items.map((item) => (
@@ -905,7 +884,7 @@ export default function GradeCheckerApp() {
                                           type="text"
                                           value={item.name}
                                           onChange={(e) => handleUpdateNestedItem(cat.id, item.id, "name", e.target.value)}
-                                          className="text-sm text-zinc-700 dark:text-zinc-300 border-b border-zinc-300 dark:border-zinc-700 bg-transparent hover:border-zinc-400 dark:hover:border-zinc-600 focus:border-indigo-500 focus:outline-none py-1 w-full sm:w-auto flex-1"
+                                          className="text-sm text-gray-700 border-b border-gray-300 bg-transparent hover:border-gray-400 focus:border-blue-500 focus:outline-none py-1 w-full sm:w-auto flex-1"
                                           placeholder="Item Name"
                                         />
                                         <div className="flex items-center gap-2">
@@ -913,19 +892,19 @@ export default function GradeCheckerApp() {
                                             type="number"
                                             value={item.score}
                                             onChange={(e) => handleUpdateNestedItem(cat.id, item.id, "score", Math.max(0, Number(e.target.value)))}
-                                            className="w-16 text-center text-sm font-medium bg-transparent border border-zinc-300 dark:border-zinc-700 rounded py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                            className="w-16 text-center text-sm font-medium border border-gray-300 rounded py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-sm"
                                           />
-                                          <span className="text-sm font-medium text-zinc-400 dark:text-zinc-500">/</span>
+                                          <span className="text-sm font-medium text-gray-400">/</span>
                                           <input
                                             type="number"
                                             value={item.maxScore}
                                             onChange={(e) => handleUpdateNestedItem(cat.id, item.id, "maxScore", Math.max(1, Number(e.target.value)))}
-                                            className="w-16 text-center text-sm font-medium bg-transparent border border-zinc-300 dark:border-zinc-700 rounded py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                            className="w-16 text-center text-sm font-medium border border-gray-300 rounded py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-sm"
                                           />
                                         </div>
                                         <button
                                           onClick={() => handleDeleteNestedItem(cat.id, item.id)}
-                                          className="text-zinc-400 hover:text-red-500 p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
+                                          className="text-gray-400 hover:text-red-500 p-1.5 rounded-md hover:bg-red-50 transition-colors"
                                           title="Remove Item"
                                         >
                                           <X size={16} />
@@ -941,12 +920,12 @@ export default function GradeCheckerApp() {
                       )}
                       
                       {weightedCategories.length > 0 && (
-                        <div className="px-6 py-4 bg-zinc-50 dark:bg-zinc-950 text-sm border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
-                          <span className="text-zinc-600 dark:text-zinc-400 font-medium">Total Assigned Weight:</span>
+                        <div className="px-6 py-4 bg-gray-50 flex items-center justify-between text-sm border-t border-gray-200">
+                          <span className="text-gray-600 font-medium">Total Assigned Weight:</span>
                           <span className={`font-semibold ${
                             weightedCategories.reduce((sum, cat) => sum + cat.weight, 0) === 100
-                              ? "text-green-700 dark:text-green-400"
-                              : "text-amber-600 dark:text-amber-450"
+                              ? "text-green-700"
+                              : "text-amber-600"
                           }`}>
                             {weightedCategories.reduce((sum, cat) => sum + cat.weight, 0)}% / 100%
                           </span>
@@ -959,13 +938,13 @@ export default function GradeCheckerApp() {
                   {gradingMode === "points" && (
                     <div className="p-4 sm:p-6">
                       {pointsAssignments.length === 0 ? (
-                        <div className="p-12 text-center text-zinc-500">
-                          <p className="font-medium text-zinc-650 dark:text-zinc-350">No assignments added yet.</p>
+                        <div className="p-10 text-center text-gray-500">
+                          <p className="font-medium text-gray-600">No assignments added yet.</p>
                           <p className="text-sm mt-1">Add assignments manually or use AI syllabus import.</p>
                         </div>
                       ) : (
                         <div className="space-y-4">
-                          <div className="grid grid-cols-12 gap-3 pb-3 text-xs font-semibold text-zinc-500 dark:text-zinc-450 uppercase tracking-wide border-b border-zinc-200 dark:border-zinc-850">
+                          <div className="grid grid-cols-12 gap-3 pb-3 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-200">
                             <div className="col-span-5">Assignment Title</div>
                             <div className="col-span-3 text-center">Score / Max</div>
                             <div className="col-span-2 text-center">Graded?</div>
@@ -978,7 +957,7 @@ export default function GradeCheckerApp() {
                                   type="text"
                                   value={a.name}
                                   onChange={(e) => handleUpdatePointAssignment(a.id, "name", e.target.value)}
-                                  className="w-full text-sm font-medium text-zinc-800 dark:text-zinc-205 border-b border-zinc-300 dark:border-zinc-700 bg-transparent focus:border-indigo-500 focus:outline-none py-1"
+                                  className="w-full text-sm font-medium text-gray-800 border-b border-gray-300 bg-transparent focus:border-blue-500 focus:outline-none py-1"
                                 />
                               </div>
                               <div className="col-span-3 flex justify-center items-center gap-1.5">
@@ -988,12 +967,12 @@ export default function GradeCheckerApp() {
                                       type="number"
                                       value={a.score}
                                       onChange={(e) => handleUpdatePointAssignment(a.id, "score", Math.max(0, Number(e.target.value)))}
-                                      className="w-16 text-center text-sm font-medium bg-transparent border border-zinc-300 dark:border-zinc-700 rounded py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                      className="w-16 text-center text-sm font-medium border border-gray-300 rounded py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-sm"
                                     />
-                                    <span className="text-zinc-400 dark:text-zinc-505 font-medium">/</span>
+                                    <span className="text-gray-400 font-medium">/</span>
                                   </>
                                 ) : (
-                                  <span className="text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 px-2 py-1.5 rounded mr-1 border border-zinc-200 dark:border-zinc-700">
+                                  <span className="text-xs font-medium bg-gray-100 text-gray-500 px-2 py-1.5 rounded mr-1 border border-gray-200">
                                     Pending
                                   </span>
                                 )}
@@ -1001,16 +980,16 @@ export default function GradeCheckerApp() {
                                   type="number"
                                   value={a.total}
                                   onChange={(e) => handleUpdatePointAssignment(a.id, "total", Math.max(1, Number(e.target.value)))}
-                                  className="w-16 text-center text-sm font-medium bg-transparent border border-zinc-300 dark:border-zinc-700 rounded py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                  className="w-16 text-center text-sm font-medium border border-gray-300 rounded py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-sm"
                                 />
                               </div>
                               <div className="col-span-2 flex justify-center">
                                 <button
                                   onClick={() => handleUpdatePointAssignment(a.id, "completed", !a.completed)}
-                                  className={`w-6 h-6 flex items-center justify-center rounded border transition-colors cursor-pointer ${
+                                  className={`w-6 h-6 flex items-center justify-center rounded border shadow-sm transition-colors cursor-pointer ${
                                     a.completed 
-                                      ? "bg-indigo-600 border-indigo-600 dark:bg-indigo-700 dark:border-indigo-705 text-white" 
-                                      : "bg-white dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700 text-transparent"
+                                      ? "bg-blue-600 border-blue-600 text-white hover:bg-blue-700" 
+                                      : "bg-white border-gray-300 text-transparent hover:bg-gray-50"
                                   }`}
                                 >
                                   <Check size={14} strokeWidth={3} />
@@ -1019,7 +998,7 @@ export default function GradeCheckerApp() {
                               <div className="col-span-2 flex justify-center">
                                 <button
                                   onClick={() => handleDeletePointAssignment(a.id)}
-                                  className="p-1.5 text-zinc-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-md transition-colors cursor-pointer"
+                                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
                                 >
                                   <Trash2 size={16} />
                                 </button>
@@ -1035,40 +1014,40 @@ export default function GradeCheckerApp() {
             </div>
 
             {/* Calculations Column */}
-            <div className="lg:col-span-5 space-y-8">
+            <div className="lg:col-span-5 space-y-6">
               {/* SUMMARY CARD */}
-              <div className="bg-white dark:bg-zinc-900 p-6 rounded-xl border border-zinc-200 dark:border-zinc-800 space-y-6">
+              <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-6">
                 <div className="flex justify-between items-start">
                   <div>
-                    <h4 className="font-semibold text-xs text-zinc-500 dark:text-zinc-455 uppercase tracking-wide">Current Standing</h4>
-                    <p className="text-4xl font-bold text-zinc-900 dark:text-white mt-1">
+                    <h4 className="font-semibold text-xs text-gray-500 uppercase tracking-wide">Current Standing</h4>
+                    <p className="text-4xl font-bold text-gray-900 mt-1">
                       {((gradingMode === "weighted" ? weightedCategories.length : pointsAssignments.length) === 0)
                         ? "—"
                         : `${currentGradeResults.currentOverallGrade}%`}
                     </p>
                   </div>
-                  <div className="bg-zinc-50 dark:bg-zinc-800 p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300">
+                  <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-200 text-gray-600">
                     <TrendingUp size={20} />
                   </div>
                 </div>
 
-                <div className="border-t border-zinc-100 dark:border-zinc-800 pt-5 space-y-4">
+                <div className="border-t border-gray-100 pt-5 space-y-4">
                   <div className="flex justify-between items-center text-sm">
-                    <span className="text-zinc-650 dark:text-zinc-350 font-medium">Desired Target Grade:</span>
-                    <span className="font-semibold text-zinc-900 dark:text-white">{desiredGrade}%</span>
+                    <span className="text-gray-600 font-medium">Desired Target Grade:</span>
+                    <span className="font-semibold text-gray-900">{desiredGrade}%</span>
                   </div>
 
                   {((gradingMode === "weighted" ? weightedCategories.length : pointsAssignments.length) === 0) ? (
-                    <div className="p-4 rounded-lg bg-zinc-50 dark:bg-zinc-950/40 border border-zinc-200 dark:border-zinc-800/80 text-zinc-550 dark:text-zinc-400 text-sm flex gap-2">
-                      <Info size={18} className="shrink-0 text-zinc-400 dark:text-zinc-505" />
+                    <div className="p-4 rounded-lg bg-gray-50 border border-gray-200 text-gray-500 text-sm flex gap-2">
+                      <Info size={18} className="shrink-0 text-gray-400" />
                       <span>Add assignments or categories to view your required score projections.</span>
                     </div>
                   ) : currentGradeResults.requiredScoreOnPending !== null ? (
-                    <div className="p-4 rounded-lg bg-indigo-50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/50 space-y-2">
-                      <h4 className="text-xs font-semibold uppercase text-indigo-800 dark:text-indigo-400 tracking-wide">Required Target</h4>
-                      <p className="text-sm font-medium text-indigo-900 dark:text-indigo-300 leading-relaxed">
+                    <div className="p-4 rounded-lg bg-blue-50 border border-blue-100 space-y-2">
+                      <h4 className="text-xs font-semibold uppercase text-blue-800 tracking-wide">Required Target</h4>
+                      <p className="text-sm font-medium text-blue-900 leading-relaxed">
                         To achieve an overall grade of <strong>{desiredGrade}%</strong>, you need to average at least{" "}
-                        <strong className="text-lg bg-indigo-200 dark:bg-indigo-900 px-1.5 rounded text-indigo-900 dark:text-indigo-200">
+                        <strong className="text-lg bg-blue-200 px-1.5 rounded">
                           {currentGradeResults.requiredScoreOnPending > 100 
                             ? "Extra Credit needed (>100%)" 
                             : `${currentGradeResults.requiredScoreOnPending}%`}
@@ -1080,37 +1059,38 @@ export default function GradeCheckerApp() {
                       </p>
                     </div>
                   ) : (
-                    <div className="p-4 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900/40 text-green-800 dark:text-green-300 text-sm font-medium flex gap-2">
+                    <div className="p-4 rounded-lg bg-green-50 border border-green-200 text-green-800 text-sm font-medium flex gap-2">
                       <Check size={18} className="shrink-0" />
-                      <span>All coursework is set up! This is your final course grade!</span>
+                      <span>All coursework is setup! This is your final course grade!</span>
                     </div>
                   )}
                 </div>
               </div>
 
               {/* GRAPH CARD */}
-              <div className="bg-white dark:bg-zinc-900 p-6 rounded-xl border border-zinc-200 dark:border-zinc-800 space-y-4">
-                <div className="border-b border-zinc-100 dark:border-zinc-800 pb-3">
-                  <h4 className="font-semibold text-zinc-800 dark:text-zinc-205">Score Projection Curve</h4>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Visualizes potential final grades based on remaining coursework.</p>
+              <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4">
+                <div className="border-b border-gray-100 pb-3">
+                  <h4 className="font-semibold text-gray-800">Score Projection Curve</h4>
+                  <p className="text-xs text-gray-500 mt-1">Visualizes potential final grades based on remaining coursework.</p>
                 </div>
                 
-                <div className="relative border border-zinc-200 dark:border-zinc-800 rounded-lg p-2 bg-zinc-50 dark:bg-zinc-950">
+                <div className="relative border border-gray-200 rounded-lg p-2 bg-gray-50">
                   <svg
                     viewBox={`0 0 ${graphWidth} ${graphHeight}`}
                     className="w-full h-auto overflow-visible"
                     style={{ maxHeight: "240px" }}
                   >
+                    {/*Modified grid lines to include 110% because extra credit is real life */}
                     {scaleGridLines.map((percent) => {
                       const { y } = getSvgCoords(0, percent);
                       return (
                         <g key={percent}>
                           <line
                             x1={graphPadding.left} y1={y} x2={graphWidth - graphPadding.right} y2={y}
-                            stroke={darkMode ? "#27272a" : "#cbd5e1"} strokeWidth="1" strokeDasharray="4 4"
+                            stroke="#cbd5e1" strokeWidth="1" strokeDasharray="4 4"
                           />
                           <text
-                            x={graphPadding.left - 8} y={y + 4} textAnchor="end" fontSize="10" className="font-medium fill-zinc-500 dark:fill-zinc-400"
+                            x={graphPadding.left - 8} y={y + 4} textAnchor="end" fontSize="10" className="font-medium fill-gray-500"
                           >
                             {percent}%
                           </text>
@@ -1127,25 +1107,25 @@ export default function GradeCheckerApp() {
                         />
                         <text
                           x={graphWidth - graphPadding.right - 5} y={getSvgCoords(0, desiredGrade).y - 8}
-                          textAnchor="end" fontSize="10" className="font-semibold fill-red-650 dark:fill-red-400 uppercase"
+                          textAnchor="end" fontSize="10" className="font-semibold fill-red-600 uppercase"
                         >
                           Target: {desiredGrade}%
                         </text>
                       </g>
                     )}
 
-                    <path d={fillD} fill={darkMode ? "#312e81" : "#e2e8f0"} opacity={darkMode ? "0.3" : "0.5"} />
-                    <path d={pathD} fill="none" stroke="#6366f1" strokeWidth="2.5" />
+                    <path d={fillD} fill="#e2e8f0" opacity="0.5" />
+                    <path d={pathD} fill="none" stroke="#3b82f6" strokeWidth="2.5" />
 
                     {isTargetVisible && targetCoords && (
                       <g>
                         <line
                           x1={targetCoords.x} y1={targetCoords.y} x2={targetCoords.x} y2={getSvgCoords(0, 0).y}
-                          stroke={darkMode ? "#52525b" : "#64748b"} strokeWidth="1.5" strokeDasharray="4 4"
+                          stroke="#64748b" strokeWidth="1.5" strokeDasharray="4 4"
                         />
-                        <circle cx={targetCoords.x} cy={targetCoords.y} r="5" className="fill-white dark:fill-zinc-900 stroke-indigo-600 dark:stroke-indigo-400 stroke-2" />
+                        <circle cx={targetCoords.x} cy={targetCoords.y} r="5" className="fill-white stroke-blue-600 stroke-2" />
                         <text
-                          x={targetCoords.x} y={getSvgCoords(0, 0).y + 14} textAnchor="middle" fontSize="11" className="font-bold fill-zinc-800 dark:fill-zinc-200"
+                          x={targetCoords.x} y={getSvgCoords(0, 0).y + 14} textAnchor="middle" fontSize="11" className="font-bold fill-gray-800"
                         >
                           {targetRequiredScore}%
                         </text>
@@ -1164,11 +1144,11 @@ export default function GradeCheckerApp() {
 
                     <line
                       x1={graphPadding.left} y1={getSvgCoords(0, 0).y} x2={graphWidth - graphPadding.right} y2={getSvgCoords(100, 0).y}
-                      stroke={darkMode ? "#3f3f46" : "#94a3b8"} strokeWidth="1.5"
+                      stroke="#94a3b8" strokeWidth="1.5"
                     />
                     <line
                       x1={graphPadding.left} y1={graphPadding.top} x2={graphPadding.left} y2={getSvgCoords(0, 0).y}
-                      stroke={darkMode ? "#3f3f46" : "#94a3b8"} strokeWidth="1.5"
+                      stroke="#94a3b8" strokeWidth="1.5"
                     />
 
                     {[0, 25, 50, 75, 100].map((val) => {
@@ -1176,8 +1156,8 @@ export default function GradeCheckerApp() {
                       const { y } = getSvgCoords(0, 0);
                       return (
                         <g key={val}>
-                          <line x1={x} y1={y} x2={x} y2={y + 5} stroke={darkMode ? "#3f3f46" : "#94a3b8"} strokeWidth="1.5" />
-                          <text x={x} y={y + 18} textAnchor="middle" fontSize="10" className="font-medium fill-zinc-650 dark:fill-zinc-400">
+                          <line x1={x} y1={y} x2={x} y2={y + 5} stroke="#94a3b8" strokeWidth="1.5" />
+                          <text x={x} y={y + 18} textAnchor="middle" fontSize="10" className="font-medium fill-gray-600">
                             {val}%
                           </text>
                         </g>
@@ -1187,11 +1167,11 @@ export default function GradeCheckerApp() {
 
                   {hoveredPoint && (
                     <div
-                      className="absolute bg-zinc-900 dark:bg-zinc-800 text-white p-2.5 rounded-md text-xs font-semibold z-10 pointer-events-none"
+                      className="absolute bg-gray-900 text-white p-2 rounded-md shadow-md text-xs font-medium z-10 pointer-events-none"
                       style={{ left: `${hoveredPoint.x + 15}px`, top: `${hoveredPoint.y - 45}px` }}
                     >
                       <div className="font-bold mb-0.5">{hoveredPoint.labelY}</div>
-                      <div className="text-zinc-300 dark:text-zinc-400 text-[11px] font-normal">{hoveredPoint.labelX}</div>
+                      <div className="text-gray-300 text-[11px]">{hoveredPoint.labelX}</div>
                     </div>
                   )}
                 </div>
@@ -1208,81 +1188,81 @@ export default function GradeCheckerApp() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.15 }}
-            className="grid grid-cols-1 lg:grid-cols-12 gap-8"
+            className="grid grid-cols-1 lg:grid-cols-12 gap-6"
           >
             {/* Scale Config Column */}
-            <div className="lg:col-span-4 space-y-8">
-              <div className="bg-white dark:bg-zinc-900 p-6 rounded-xl border border-zinc-200 dark:border-zinc-800 space-y-5">
-                <div className="flex justify-between items-center border-b border-zinc-100 dark:border-zinc-800 pb-3">
-                  <h3 className="font-semibold text-zinc-850 dark:text-zinc-200 flex items-center gap-2">
-                    <Settings size={18} className="text-zinc-500 dark:text-zinc-400" /> GPA Grading Rules
+            <div className="lg:col-span-4 space-y-6">
+              <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-5">
+                <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+                  <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                    <Settings size={18} className="text-gray-500" /> GPA Grading Rules
                   </h3>
                   <button
                     onClick={() => setShowScaleConfig(!showScaleConfig)}
-                    className="text-xs font-medium text-indigo-650 dark:text-indigo-400 hover:underline cursor-pointer"
+                    className="text-xs font-medium text-blue-600 hover:text-blue-800 cursor-pointer"
                   >
                     {showScaleConfig ? "Hide Grading Scale" : "Edit Grading Scale"}
                   </button>
                 </div>
 
                 <div className="space-y-3">
-                  <span className="block text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
+                  <span className="block text-xs font-semibold text-gray-500 uppercase tracking-wide">
                     Weighted Course Boosts
                   </span>
                   <div className="grid grid-cols-3 gap-3">
                     <div>
-                      <label className="block text-xs text-zinc-500 dark:text-zinc-400 mb-1">Honors</label>
+                      <label className="block text-xs text-gray-500 mb-1">Honors</label>
                       <input
                         type="number" step="0.1" min="0"
                         value={weightingConfig.honorsBoost}
                         onChange={(e) => saveWeightingConfig({ ...weightingConfig, honorsBoost: Number(e.target.value) })}
-                        className="w-full text-center text-sm font-semibold bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-md py-1.5 focus:ring-1 focus:ring-indigo-500"
+                        className="w-full text-center text-sm font-medium border border-gray-300 rounded-md py-1.5 focus:ring-1 focus:ring-blue-500 shadow-sm"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-zinc-500 dark:text-zinc-400 mb-1">AP</label>
+                      <label className="block text-xs text-gray-500 mb-1">AP</label>
                       <input
                         type="number" step="0.1" min="0"
                         value={weightingConfig.apBoost}
                         onChange={(e) => saveWeightingConfig({ ...weightingConfig, apBoost: Number(e.target.value) })}
-                        className="w-full text-center text-sm font-semibold bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-md py-1.5 focus:ring-1 focus:ring-indigo-500"
+                        className="w-full text-center text-sm font-medium border border-gray-300 rounded-md py-1.5 focus:ring-1 focus:ring-blue-500 shadow-sm"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-zinc-500 dark:text-zinc-400 mb-1">IB</label>
+                      <label className="block text-xs text-gray-500 mb-1">IB</label>
                       <input
                         type="number" step="0.1" min="0"
                         value={weightingConfig.ibBoost}
                         onChange={(e) => saveWeightingConfig({ ...weightingConfig, ibBoost: Number(e.target.value) })}
-                        className="w-full text-center text-sm font-semibold bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-md py-1.5 focus:ring-1 focus:ring-indigo-500"
+                        className="w-full text-center text-sm font-medium border border-gray-300 rounded-md py-1.5 focus:ring-1 focus:ring-blue-500 shadow-sm"
                       />
                     </div>
                   </div>
                 </div>
 
                 {showScaleConfig ? (
-                  <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800">
-                    <span className="block text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-3">Scale Editor</span>
+                  <div className="pt-4 border-t border-gray-100">
+                    <span className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Scale Editor</span>
                     <div className="max-h-60 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
                       {gpaRules.map((r) => (
-                        <div key={r.grade} className="flex items-center justify-between gap-3 bg-zinc-50 dark:bg-zinc-950 p-2 rounded border border-zinc-200 dark:border-zinc-850">
-                          <span className="w-8 font-bold text-zinc-700 dark:text-zinc-300 text-sm">{r.grade}</span>
+                        <div key={r.grade} className="flex items-center justify-between gap-3 bg-gray-50 p-2 rounded border border-gray-200">
+                          <span className="w-8 font-bold text-gray-700 text-sm">{r.grade}</span>
                           <div className="flex items-center gap-2">
-                            <span className="text-xs text-zinc-500">Pts:</span>
+                            <span className="text-xs text-gray-500">Pts:</span>
                             <input
                               type="number" step="0.05" min="0" max="5"
                               value={r.points}
                               onChange={(e) => handleUpdateGPAScaleRule(r.grade, "points", Number(e.target.value))}
-                              className="w-16 text-center text-sm font-medium bg-transparent border border-zinc-300 dark:border-zinc-700 rounded py-1"
+                              className="w-16 text-center text-sm font-medium border border-gray-300 rounded py-1 shadow-sm"
                             />
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="text-xs text-zinc-500">Min %:</span>
+                            <span className="text-xs text-gray-500">Min %:</span>
                             <input
                               type="number" min="0" max="100"
                               value={r.minPercent}
                               onChange={(e) => handleUpdateGPAScaleRule(r.grade, "minPercent", Number(e.target.value))}
-                              className="w-16 text-center text-sm font-medium bg-transparent border border-zinc-300 dark:border-zinc-700 rounded py-1"
+                              className="w-16 text-center text-sm font-medium border border-gray-300 rounded py-1 shadow-sm"
                             />
                           </div>
                         </div>
@@ -1290,13 +1270,13 @@ export default function GradeCheckerApp() {
                     </div>
                   </div>
                 ) : (
-                  <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800">
-                    <span className="block text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-3">Scale Preview</span>
+                  <div className="pt-4 border-t border-gray-100">
+                    <span className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Scale Preview</span>
                     <div className="grid grid-cols-4 gap-2">
                       {gpaRules.slice(0, 8).map((r) => (
-                        <div key={r.grade} className="bg-zinc-50 dark:bg-zinc-950 p-2 rounded-lg border border-zinc-200 dark:border-zinc-850 flex flex-col items-center">
-                          <span className="font-semibold text-zinc-800 dark:text-zinc-200 text-sm">{r.grade}</span>
-                          <span className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">{r.points} pt</span>
+                        <div key={r.grade} className="bg-gray-50 p-2 rounded-lg border border-gray-200 flex flex-col items-center">
+                          <span className="font-semibold text-gray-800 text-sm">{r.grade}</span>
+                          <span className="text-xs text-gray-500 mt-0.5">{r.points} pt</span>
                         </div>
                       ))}
                     </div>
@@ -1306,30 +1286,30 @@ export default function GradeCheckerApp() {
             </div>
 
             {/* GPA Courses Column */}
-            <div className="lg:col-span-8 space-y-8">
+            <div className="lg:col-span-8 space-y-6">
               {/* Stats Card */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 bg-white dark:bg-zinc-900 p-6 rounded-xl border border-zinc-200 dark:border-zinc-800">
-                <div className="flex flex-col items-center justify-center p-6 border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 rounded-xl">
-                  <h4 className="font-semibold text-xs text-zinc-500 dark:text-zinc-405 uppercase tracking-wide">Unweighted GPA</h4>
-                  <p className="text-5xl font-bold text-zinc-900 dark:text-white mt-2">{gpaResult.unweightedGPA.toFixed(2)}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                <div className="flex flex-col items-center justify-center p-6 border border-gray-200 bg-gray-50 rounded-xl">
+                  <h4 className="font-semibold text-xs text-gray-500 uppercase tracking-wide">Unweighted GPA</h4>
+                  <p className="text-5xl font-bold text-gray-900 mt-2">{gpaResult.unweightedGPA.toFixed(2)}</p>
                 </div>
-                <div className="flex flex-col items-center justify-center p-6 border border-indigo-200 dark:border-indigo-900/50 bg-indigo-50 dark:bg-indigo-950/20 rounded-xl relative overflow-hidden">
-                  <h4 className="font-semibold text-xs text-indigo-700 dark:text-indigo-400 uppercase tracking-wide">Weighted GPA</h4>
-                  <p className="text-5xl font-bold text-indigo-900 dark:text-indigo-200 mt-2">{gpaResult.weightedGPA.toFixed(2)}</p>
-                  <span className="text-xs font-semibold mt-3 bg-white dark:bg-zinc-900 border border-indigo-200 dark:border-indigo-900 text-indigo-800 dark:text-indigo-300 px-3 py-1 rounded-full">
+                <div className="flex flex-col items-center justify-center p-6 border border-blue-200 bg-blue-50 rounded-xl relative overflow-hidden shadow-inner">
+                  <h4 className="font-semibold text-xs text-blue-700 uppercase tracking-wide">Weighted GPA</h4>
+                  <p className="text-5xl font-bold text-blue-900 mt-2">{gpaResult.weightedGPA.toFixed(2)}</p>
+                  <span className="text-xs font-medium mt-3 bg-white border border-blue-200 text-blue-800 px-3 py-1 rounded-full shadow-sm">
                     {gpaResult.totalCredits} Total Credits
                   </span>
                 </div>
               </div>
 
               {/* Course List Card */}
-              <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
-                <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center bg-zinc-50 dark:bg-zinc-900/60">
-                  <h3 className="font-semibold text-zinc-800 dark:text-zinc-200">Semester Course List</h3>
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                  <h3 className="font-semibold text-gray-800">Semester Course List</h3>
                   <div className="flex gap-2">
                     <button
                       onClick={handleAddGPACourse}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-755 dark:hover:bg-indigo-650 rounded-md transition-colors cursor-pointer"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm transition-colors cursor-pointer"
                     >
                       <Plus size={16} /> <span>Add New Course</span>
                     </button>
@@ -1338,13 +1318,13 @@ export default function GradeCheckerApp() {
 
                 <div className="p-4 sm:p-6">
                   {gpaCourses.length === 0 ? (
-                    <div className="text-center p-12">
-                      <p className="font-medium text-zinc-650 dark:text-zinc-350">No courses mapped out yet.</p>
-                      <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Click "Add New Course" to start planning your GPA.</p>
+                    <div className="text-center p-10">
+                      <p className="font-medium text-gray-600">No courses mapped out yet.</p>
+                      <p className="text-sm text-gray-500 mt-1">Click "Add New Course" to start planning your GPA.</p>
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      <div className="grid grid-cols-12 gap-3 pb-3 text-xs font-semibold text-zinc-500 dark:text-zinc-455 uppercase tracking-wide border-b border-zinc-200 dark:border-zinc-850">
+                      <div className="grid grid-cols-12 gap-3 pb-3 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-200">
                         <div className="col-span-5">Course Title</div>
                         <div className="col-span-3">Level</div>
                         <div className="col-span-2 text-center">Credits</div>
@@ -1356,7 +1336,7 @@ export default function GradeCheckerApp() {
                           <div className="col-span-5 flex items-center gap-3">
                             <button
                               onClick={() => handleDeleteGPACourse(c.id)}
-                              className="p-1.5 text-zinc-400 hover:text-red-650 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-md transition-colors cursor-pointer shrink-0"
+                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors cursor-pointer shrink-0"
                               title="Remove Course"
                             >
                               <Trash2 size={16} />
@@ -1365,7 +1345,7 @@ export default function GradeCheckerApp() {
                               type="text"
                               value={c.name}
                               onChange={(e) => handleUpdateGPACourse(c.id, "name", e.target.value)}
-                              className="w-full text-sm font-medium text-zinc-900 dark:text-white border-b border-zinc-300 dark:border-zinc-700 bg-transparent focus:border-indigo-500 focus:outline-none py-1"
+                              className="w-full text-sm font-medium text-gray-900 border-b border-gray-300 bg-transparent focus:border-blue-500 focus:outline-none py-1"
                               placeholder="Course Name"
                             />
                           </div>
@@ -1374,7 +1354,7 @@ export default function GradeCheckerApp() {
                             <select
                               value={c.level}
                               onChange={(e) => handleUpdateGPACourse(c.id, "level", e.target.value)}
-                              className="w-full text-sm font-medium border border-zinc-300 dark:border-zinc-700 rounded-md p-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white cursor-pointer"
+                              className="w-full text-sm font-medium border border-gray-300 rounded-md p-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white shadow-sm"
                             >
                               <option value="Regular">Regular</option>
                               <option value="Honors">Honors</option>
@@ -1388,7 +1368,7 @@ export default function GradeCheckerApp() {
                               type="number" min="1" max="10" step="0.5"
                               value={c.credits}
                               onChange={(e) => handleUpdateGPACourse(c.id, "credits", Math.max(0.5, Number(e.target.value)))}
-                              className="w-full text-center text-sm font-semibold bg-transparent border border-zinc-300 dark:border-zinc-700 rounded-md py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                              className="w-full text-center text-sm font-medium border border-gray-300 rounded-md py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-sm"
                             />
                           </div>
 
@@ -1396,7 +1376,7 @@ export default function GradeCheckerApp() {
                             <select
                               value={c.grade}
                               onChange={(e) => handleUpdateGPACourse(c.id, "grade", e.target.value)}
-                              className="w-full text-sm font-semibold border border-zinc-300 dark:border-zinc-700 rounded-md p-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white text-center cursor-pointer"
+                              className="w-full text-sm font-semibold border border-gray-300 rounded-md p-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white text-center shadow-sm"
                             >
                               {gpaRules.map((rule) => (
                                 <option key={rule.grade} value={rule.grade}>{rule.grade}</option>
@@ -1414,93 +1394,73 @@ export default function GradeCheckerApp() {
         )}
       </AnimatePresence>
 
-      {/* SMART IMPORT DIALOG MODAL */}
+      {/* AI IMPORT DIALOG MODAL */}
       <AnimatePresence>
         {showImportDialog && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-zinc-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-colors duration-200"
+            className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50"
           >
             <motion.div
               initial={{ scale: 0.95, y: 10 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.95, y: 10 }}
-              className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 max-w-xl w-full overflow-hidden shadow-none"
+              className="bg-white rounded-xl shadow-xl border border-gray-200 max-w-lg w-full overflow-hidden"
             >
-              <div className="px-6 py-4 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center bg-zinc-50 dark:bg-zinc-900/60">
-                <h3 className="font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
-                  <Sparkles size={18} className="text-indigo-600 dark:text-indigo-400" /> AI Syllabus & Grades Importer
+              <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                  <Sparkles size={18} className="text-blue-600" /> Syllabus AI Importer
                 </h3>
                 <button
                   onClick={() => setShowImportDialog(false)}
-                  className="p-1 text-zinc-400 hover:text-zinc-650 dark:hover:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-md transition-colors"
+                  className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-md transition-colors"
                 >
                   <X size={20} />
                 </button>
               </div>
 
-              <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
-                <p className="text-sm text-zinc-650 dark:text-zinc-350 leading-relaxed">
-                  Avoid entering your grades manually! Paste both your syllabus rules (weightings, categories) and your current scores or transcripts below.
+              <div className="p-6 space-y-4">
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  Paste sections from your course syllabus. The AI will automatically extract the grading framework, weights, categories, and scale.
                 </p>
 
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-2">
-                      Syllabus Rules & Categories
-                    </label>
-                    <textarea
-                      rows={4}
-                      value={syllabusText}
-                      onChange={(e) => setSyllabusText(e.target.value)}
-                      className="w-full text-sm p-3 border border-zinc-300 dark:border-zinc-750 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-white placeholder:text-zinc-400"
-                      placeholder="Example: Homework - 25%, Projects - 35%, Quizzes - 40%..."
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-2">
-                      Current Gradebook / Achieved Grades (Optional)
-                    </label>
-                    <textarea
-                      rows={4}
-                      value={currentGradesText}
-                      onChange={(e) => setCurrentGradesText(e.target.value)}
-                      className="w-full text-sm p-3 border border-zinc-300 dark:border-zinc-750 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-white placeholder:text-zinc-400"
-                      placeholder="Paste text from your grade portal or PDF list of scored assignments..."
-                    />
-                  </div>
-                </div>
+                <textarea
+                  rows={6}
+                  value={syllabusText}
+                  onChange={(e) => setSyllabusText(e.target.value)}
+                  className="w-full text-sm p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none bg-gray-50 placeholder:text-gray-400"
+                  placeholder="Example: Tests are 40%, Homework is 30%, Final is 30%. Grading: A > 92, B > 84..."
+                />
 
                 {parseError && (
-                  <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 rounded-md text-sm text-red-700 dark:text-red-300 flex gap-2 items-start">
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700 flex gap-2 items-start">
                     <Info size={16} className="shrink-0 mt-0.5" />
                     <span>{parseError}</span>
                   </div>
                 )}
               </div>
 
-              <div className="px-6 py-4 bg-zinc-50 dark:bg-zinc-900/60 border-t border-zinc-150 dark:border-zinc-800 flex justify-end gap-3">
+              <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
                 <button
                   onClick={() => setShowImportDialog(false)}
-                  className="px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-750 rounded-md transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-100 rounded-md shadow-sm transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleParseSyllabus}
                   disabled={isParsing || !syllabusText.trim()}
-                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent hover:bg-indigo-700 disabled:bg-indigo-300 rounded-md transition-colors disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent hover:bg-blue-700 disabled:bg-blue-300 rounded-md shadow-sm transition-colors disabled:cursor-not-allowed"
                 >
                   {isParsing ? (
                     <>
                       <div className="h-4 w-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                      <span>Processing Imports...</span>
+                      <span>Extracting Data...</span>
                     </>
                   ) : (
-                    "Extract All Data"
+                    "Extract Syllabus Data"
                   )}
                 </button>
               </div>
